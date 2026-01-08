@@ -136,7 +136,7 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
       {/* Fullscreen Button - Below user button */}
       <motion.button
         onClick={toggleFullscreen}
-        className={`absolute top-14 left-3 md:top-16 md:left-4 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
+        className={`absolute top-[60px] left-3 md:top-[72px] md:left-4 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
           isFullscreen 
             ? 'border-electric-blue text-electric-blue' 
             : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
