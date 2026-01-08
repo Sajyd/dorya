@@ -21,10 +21,50 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
   const [showCustomize, setShowCustomize] = useState(false)
   const [showAudioSettings, setShowAudioSettings] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const audioSettingsRef = useRef<HTMLDivElement>(null)
   const { currency } = useCustomization()
   const { user, isLoggedIn, isLoading } = useUser()
   const { settings, setMusicEnabled, setSfxEnabled } = useAudio()
+
+  // Track fullscreen state
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        const elem = document.documentElement as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void>
+        }
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen()
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen()
+        }
+      } else {
+        const doc = document as Document & {
+          webkitExitFullscreen?: () => Promise<void>
+        }
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen()
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen()
+        }
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err)
+    }
+  }
 
   // Detect mobile/small screen (check both width and height for landscape mode)
   useEffect(() => {
@@ -307,11 +347,58 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
         </motion.div>
       </div>
 
-      {/* Audio Settings Button - Bottom Left Corner */}
-      <div 
-        ref={audioSettingsRef}
-        className="absolute left-3 bottom-3 md:left-4 md:bottom-4 z-20"
-      >
+      {/* Bottom Left Controls - Fullscreen & Audio */}
+      <div className="absolute left-3 bottom-3 md:left-4 md:bottom-4 z-20 flex items-center gap-2">
+        {/* Fullscreen Button */}
+        <motion.button
+          onClick={toggleFullscreen}
+          className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
+            isFullscreen 
+              ? 'border-electric-blue text-electric-blue' 
+              : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+          }`}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.7 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+        >
+          {isFullscreen ? (
+            <svg 
+              className="w-5 h-5 md:w-6 md:h-6" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+              <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+              <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+              <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+            </svg>
+          ) : (
+            <svg 
+              className="w-5 h-5 md:w-6 md:h-6" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+              <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+              <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+            </svg>
+          )}
+        </motion.button>
+
+        {/* Audio Settings Button */}
+        <div ref={audioSettingsRef} className="relative">
         <motion.button
           onClick={() => setShowAudioSettings(!showAudioSettings)}
           className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
@@ -419,6 +506,7 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* Discord Button */}
