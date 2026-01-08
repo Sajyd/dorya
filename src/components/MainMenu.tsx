@@ -133,6 +133,54 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
         )}
       </motion.button>
 
+      {/* Fullscreen Button - Below user button */}
+      <motion.button
+        onClick={toggleFullscreen}
+        className={`absolute top-14 left-3 md:top-16 md:left-4 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
+          isFullscreen 
+            ? 'border-electric-blue text-electric-blue' 
+            : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+        }`}
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.6 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+      >
+        {isFullscreen ? (
+          <svg 
+            className="w-5 h-5 md:w-6 md:h-6" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+            <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+            <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+            <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+          </svg>
+        ) : (
+          <svg 
+            className="w-5 h-5 md:w-6 md:h-6" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+          </svg>
+        )}
+      </motion.button>
+
       {/* Currency display - top right */}
       <motion.div 
         className="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-2 md:gap-3"
@@ -347,58 +395,11 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
         </motion.div>
       </div>
 
-      {/* Bottom Left Controls - Fullscreen & Audio */}
-      <div className="absolute left-3 bottom-3 md:left-4 md:bottom-4 z-20 flex items-center gap-2">
-        {/* Fullscreen Button */}
-        <motion.button
-          onClick={toggleFullscreen}
-          className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
-            isFullscreen 
-              ? 'border-electric-blue text-electric-blue' 
-              : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-          }`}
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.7 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-        >
-          {isFullscreen ? (
-            <svg 
-              className="w-5 h-5 md:w-6 md:h-6" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M8 3v3a2 2 0 0 1-2 2H3" />
-              <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
-              <path d="M3 16h3a2 2 0 0 1 2 2v3" />
-              <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
-            </svg>
-          ) : (
-            <svg 
-              className="w-5 h-5 md:w-6 md:h-6" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-              <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-              <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-            </svg>
-          )}
-        </motion.button>
-
-        {/* Audio Settings Button */}
-        <div ref={audioSettingsRef} className="relative">
+      {/* Audio Settings Button - Bottom Left Corner */}
+      <div 
+        ref={audioSettingsRef}
+        className="absolute left-3 bottom-3 md:left-4 md:bottom-4 z-20"
+      >
         <motion.button
           onClick={() => setShowAudioSettings(!showAudioSettings)}
           className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
@@ -506,7 +507,6 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
             </motion.div>
           )}
         </AnimatePresence>
-        </div>
       </div>
 
       {/* Discord Button */}

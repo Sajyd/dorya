@@ -141,12 +141,24 @@ export default function Game({ mode, onBack }: GameProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.isPlaying, state.isPaused, pauseGame, resumeGame])
 
-  // Check for game over conditions
-  if (state.isPlaying && mode === 'PEWGF_MINUTE' && state.timeRemaining <= 0) {
-    if (!showResult) {
+  // Track previous isPlaying state to detect game end
+  const wasPlayingRef = useRef(state.isPlaying)
+  
+  // Detect automatic game end and show results
+  useEffect(() => {
+    const wasPlaying = wasPlayingRef.current
+    wasPlayingRef.current = state.isPlaying
+    
+    // Game just ended automatically (was playing, now not playing)
+    // This handles SURVIVAL (miss ends game) and PEWGF_MINUTE (timer ends)
+    if (wasPlaying && !state.isPlaying && !showResult) {
+      // Calculate and award coins
+      const earned = calculateCoinsEarned(state.perfectCount, state.goodCount, state.maxStreak, mode === 'PEWGF_MINUTE')
+      setCoinsEarned(earned)
+      addCoins(earned)
       setShowResult(true)
     }
-  }
+  }, [state.isPlaying, showResult, state.perfectCount, state.goodCount, state.maxStreak, mode, addCoins])
 
   return (
     <div className="h-full w-full relative overflow-hidden bg-black">
