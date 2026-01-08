@@ -1,0 +1,141 @@
+// Prisma schema for Dorya Game leaderboard
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Game modes enum
+enum GameMode {
+  DORYA_STREAK
+  PEWGF_MINUTE
+  SURVIVAL
+  FREESTYLE
+}
+
+// Player profiles
+model Player {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Auth (optional - null for guest-submitted scores)
+  passwordHash      String?
+  passwordSalt      String?
+  authToken         String?   @unique
+  
+  // Stats
+  totalDoryas       Int     @default(0)
+  totalPewgfs       Int     @default(0)
+  totalGamesPlayed  Int     @default(0)
+  totalPlayTime     Int     @default(0) // in seconds
+  
+  // Currency
+  doryaCoins        Int     @default(0)
+  premiumCoins      Int     @default(0)
+  
+  // Relations
+  ladderScores      LadderScore[]
+  gameHistory       GameSession[]
+  inventory         PlayerInventory?
+  crateHistory      CrateOpen[]
+  purchasedCrates   PurchasedCrate[]
+}
+
+// Player inventory for owned items
+model PlayerInventory {
+  id                    String    @id @default(cuid())
+  playerId              String    @unique
+  player                Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  
+  // Owned item IDs (stored as JSON array)
+  ownedItems            Json      @default("[]")
+  
+  // Selected customizations
+  selectedStage         String    @default("stage_classic")
+  selectedElectricColor String    @default("electric_blue")
+  selectedCharacter     String    @default("char_mishima")
+  selectedDummy         String    @default("dummy_classic")
+  
+  updatedAt             DateTime  @updatedAt
+}
+
+// Track loot crate opens
+model CrateOpen {
+  id            String    @id @default(cuid())
+  playerId      String
+  player        Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  
+  crateType     String    // basic, premium, legendary
+  itemsReceived Json      // Array of item IDs received
+  coinsSpent    Int       @default(0)
+  premiumSpent  Int       @default(0)
+  
+  createdAt     DateTime  @default(now())
+  
+  @@index([playerId])
+}
+
+// Purchased crates (via Stripe) that haven't been opened yet
+model PurchasedCrate {
+  id              String    @id @default(cuid())
+  playerId        String
+  player          Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  
+  crateType       String    // basic, premium, legendary
+  stripeSessionId String?   @unique // Stripe checkout session ID
+  stripePaymentId String?   // Stripe payment intent ID
+  
+  isOpened        Boolean   @default(false)
+  openedAt        DateTime?
+  itemsReceived   Json?     // Populated when opened
+  
+  purchasedAt     DateTime  @default(now())
+  
+  @@index([playerId])
+  @@index([stripeSessionId])
+}
+
+// Ladder scores for different modes
+model LadderScore {
+  id          String    @id @default(cuid())
+  playerId    String
+  player      Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  
+  mode        GameMode
+  score       Int
+  details     Json?     // Additional details as JSON
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([mode, score])
+  @@index([playerId])
+}
+
+// Individual game sessions
+model GameSession {
+  id            String    @id @default(cuid())
+  playerId      String
+  player        Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  
+  mode          GameMode
+  score         Int
+  perfectInputs Int       @default(0)
+  goodInputs    Int       @default(0)
+  missedInputs  Int       @default(0)
+  maxCombo      Int       @default(0)
+  duration      Int       // in seconds
+  
+  // Command history stored as JSON
+  commandHistory Json?
+  
+  createdAt     DateTime  @default(now())
+  
+  @@index([playerId])
+  @@index([mode])
+}
