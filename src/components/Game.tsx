@@ -181,8 +181,8 @@ export default function Game({ mode, onBack }: GameProps) {
         onBack={handleQuit}
       />
 
-      {/* Command History */}
-      <div className="absolute left-4 bottom-4 z-20 hidden md:block">
+      {/* Command History - hidden on touch devices where mobile controls are shown */}
+      <div className="absolute left-4 bottom-4 z-20 hidden lg:block">
         <CommandHistory inputs={inputHistory} lastAttempt={state.lastAttempt || lastAttempt} />
       </div>
 

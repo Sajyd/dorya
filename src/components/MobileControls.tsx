@@ -12,6 +12,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   const [isMobile, setIsMobile] = useState(false)
   const activeKeysRef = useRef<Set<string>>(new Set())
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set())
+  // Track which touch identifiers are pressing which keys
+  const touchToKeyRef = useRef<Map<number, string>>(new Map())
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -37,12 +39,43 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     onInputChange(newSet)
   }, [onInputChange])
 
-  const handleTouchStart = useCallback((key: string) => (e: React.TouchEvent | React.MouseEvent) => {
+  const handleTouchStart = useCallback((key: string) => (e: React.TouchEvent) => {
+    e.preventDefault()
+    // Track each touch by its identifier
+    const touches = e.changedTouches
+    for (let i = 0; i < touches.length; i++) {
+      const touch = touches[i]
+      touchToKeyRef.current.set(touch.identifier, key)
+    }
+    updateKeys(key, true)
+  }, [updateKeys])
+
+  const handleTouchEnd = useCallback((key: string) => (e: React.TouchEvent) => {
+    e.preventDefault()
+    // Only release the key if no other touches are holding it
+    const touches = e.changedTouches
+    for (let i = 0; i < touches.length; i++) {
+      const touch = touches[i]
+      touchToKeyRef.current.delete(touch.identifier)
+    }
+    
+    // Check if any remaining touch is still holding this key
+    let stillHeld = false
+    touchToKeyRef.current.forEach((heldKey) => {
+      if (heldKey === key) stillHeld = true
+    })
+    
+    if (!stillHeld) {
+      updateKeys(key, false)
+    }
+  }, [updateKeys])
+
+  const handleMouseDown = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
     updateKeys(key, true)
   }, [updateKeys])
 
-  const handleTouchEnd = useCallback((key: string) => (e: React.TouchEvent | React.MouseEvent) => {
+  const handleMouseUp = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
     updateKeys(key, false)
   }, [updateKeys])
@@ -82,9 +115,9 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
         onTouchStart={handleTouchStart(keyCode)}
         onTouchEnd={handleTouchEnd(keyCode)}
         onTouchCancel={handleTouchEnd(keyCode)}
-        onMouseDown={handleTouchStart(keyCode)}
-        onMouseUp={handleTouchEnd(keyCode)}
-        onMouseLeave={handleTouchEnd(keyCode)}
+        onMouseDown={handleMouseDown(keyCode)}
+        onMouseUp={handleMouseUp(keyCode)}
+        onMouseLeave={handleMouseUp(keyCode)}
         whileTap={{ scale: 0.9 }}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
@@ -116,9 +149,9 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
         onTouchStart={handleTouchStart('KeyK')}
         onTouchEnd={handleTouchEnd('KeyK')}
         onTouchCancel={handleTouchEnd('KeyK')}
-        onMouseDown={handleTouchStart('KeyK')}
-        onMouseUp={handleTouchEnd('KeyK')}
-        onMouseLeave={handleTouchEnd('KeyK')}
+        onMouseDown={handleMouseDown('KeyK')}
+        onMouseUp={handleMouseUp('KeyK')}
+        onMouseLeave={handleMouseUp('KeyK')}
         whileTap={{ scale: 0.85 }}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >

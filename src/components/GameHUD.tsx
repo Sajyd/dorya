@@ -150,8 +150,8 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: Ga
         )}
       </AnimatePresence>
 
-      {/* Bottom - Input display (hidden on mobile - touch controls shown instead) */}
-      <div className="absolute bottom-4 right-4 flex gap-2 pointer-events-none hidden md:flex">
+      {/* Bottom - Input display (hidden on mobile/touch devices - touch controls shown instead) */}
+      <div className="absolute bottom-4 right-4 flex gap-2 pointer-events-none hidden lg:flex">
         {/* Direction keys */}
         <div className="grid grid-cols-3 gap-1">
           <div />
