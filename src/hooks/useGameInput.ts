@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useRef, useState } from 'react'
-import { CommandInput, DoryaAttempt, InputDirection, InputButton } from '@/types/game'
+import { CommandInput, DoryaAttempt, WavedashAttempt, InputDirection, InputButton } from '@/types/game'
 
 // Key mappings - using fighting game standard layout
 const DIRECTION_KEYS: Record<string, InputDirection> = {
@@ -20,6 +20,7 @@ const FRAME_MS = 1000 / 60
 interface UseGameInputReturn {
   currentInputs: CommandInput[]
   lastAttempt: DoryaAttempt | null
+  lastWavedash: WavedashAttempt | null
   activeKeys: Set<string>
   resetInputs: () => void
   inputHistory: CommandInput[]
@@ -28,10 +29,12 @@ interface UseGameInputReturn {
 
 export function useGameInput(
   isPlaying: boolean,
-  onDoryaAttempt: (attempt: DoryaAttempt) => void
+  onDoryaAttempt: (attempt: DoryaAttempt) => void,
+  onWavedash?: (attempt: WavedashAttempt) => void
 ): UseGameInputReturn {
   const [currentInputs, setCurrentInputs] = useState<CommandInput[]>([])
   const [lastAttempt, setLastAttempt] = useState<DoryaAttempt | null>(null)
+  const [lastWavedash, setLastWavedash] = useState<WavedashAttempt | null>(null)
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set())
   const [inputHistory, setInputHistory] = useState<CommandInput[]>([])
   
@@ -73,6 +76,49 @@ export function useGameInput(
     }
   }, [])
 
+  // Check if inputs form a valid wavedash motion (f → n → d → df) without punch
+  const checkWavedashMotion = useCallback((inputs: CommandInput[]): WavedashAttempt | null => {
+    // Find the key inputs (direction only, no button)
+    const forwardInput = inputs.find(i => i.direction === 'f' && i.button === 'none')
+    const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
+    const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
+    const dfInput = inputs.find(i => i.direction === 'df' && i.button === 'none')
+    
+    // Must have all four inputs for a wavedash
+    if (!forwardInput || !dfInput) {
+      return null
+    }
+    
+    // Check sequence order: f → ... → df
+    if (forwardInput.timestamp > dfInput.timestamp) {
+      return null
+    }
+    
+    // Check if we have the clean motion: f → n → d → df
+    let isClean = false
+    if (neutralInput && downInput) {
+      // Full clean motion: f → n → d → df
+      if (forwardInput.timestamp < neutralInput.timestamp &&
+          neutralInput.timestamp < downInput.timestamp &&
+          downInput.timestamp < dfInput.timestamp) {
+        isClean = true
+      }
+    } else if (downInput) {
+      // Acceptable: f → d → df (skipped neutral)
+      if (forwardInput.timestamp < downInput.timestamp &&
+          downInput.timestamp < dfInput.timestamp) {
+        isClean = true
+      }
+    }
+    
+    // Valid wavedash motion
+    return {
+      inputs: [...inputs],
+      timestamp: Date.now(),
+      isClean,
+    }
+  }, [])
+
   // Check if inputs form a valid WGF motion (f → n → d → df+2) regardless of timing
   const checkWGFMotion = useCallback((inputs: CommandInput[]): boolean => {
     // Find the key inputs
@@ -111,15 +157,20 @@ export function useGameInput(
   }, [])
 
   const checkDoryaInput = useCallback((inputs: CommandInput[]): DoryaAttempt | null => {
-    // EWGF input: f, d, df+2 (14 frame startup)
+    // EWGF input: f, n, d, df+2 (14 frame startup)
     // True PEWGF (13 frame startup): f, n, df+2 OR f, d~df+2 on same frame
-    // INVALID: f, df, df+2 (going directly from f to df without neutral or pure d)
+    // INVALID patterns:
+    //   - f, n, df, df+2 (separate df before df+2 on different frame)
+    //   - f, n, f, df, df+2 (extra forward after neutral)
+    //   - f, n, d, df, df+2 (separate df after d)
+    //   - f, df, df+2 (no neutral or down, just held forward)
     
     // Find the key inputs
     const forwardInput = inputs.find(i => i.direction === 'f' && i.button === 'none')
     const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
     const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
     const dfPunchInput = inputs.find(i => i.direction === 'df' && i.button === '2')
+    const dfNoPunchInput = inputs.find(i => i.direction === 'df' && i.button === 'none')
     
     // Must have forward and df+2
     if (!forwardInput || !dfPunchInput) {
@@ -129,6 +180,27 @@ export function useGameInput(
     // Check sequence order: forward must come before df+2
     if (forwardInput.timestamp > dfPunchInput.timestamp) {
       return null
+    }
+    
+    // INVALID: If there's any df (without punch) in the sequence after forward
+    // This means df and df+2 were on different frames (otherwise df would be replaced by df+2)
+    // Catches: f, n, df, df+2 | f, df, df+2 | f, n, d, df, df+2 | etc.
+    if (dfNoPunchInput && dfNoPunchInput.timestamp > forwardInput.timestamp) {
+      return null
+    }
+    
+    // INVALID: Check for extra forwards after neutral
+    // Catches: f, n, f, df+2 | f, n, f, d, df+2 | etc.
+    if (neutralInput) {
+      const forwardsAfterNeutral = inputs.filter(i => 
+        i.direction === 'f' && 
+        i.button === 'none' && 
+        i.timestamp > neutralInput.timestamp && 
+        i.timestamp < dfPunchInput.timestamp
+      )
+      if (forwardsAfterNeutral.length > 0) {
+        return null
+      }
     }
     
     let result: 'perfect' | 'good' | 'bad'
@@ -150,7 +222,7 @@ export function useGameInput(
       result = 'perfect'
       frameDiff = 0
     } else if (hasDownBetween) {
-      // f → d → df+2 pattern
+      // f → (n) → d → df+2 pattern (neutral is optional)
       // Calculate timing: frames between d and df+2
       frameDiff = dfPunchInput.frame - downInput!.frame
       
@@ -168,7 +240,7 @@ export function useGameInput(
         return null
       }
     } else {
-      // Invalid motion: f → df → df+2 (no neutral or pure down between f and df+2)
+      // Invalid motion: no neutral or pure down between f and df+2
       // This happens when player holds forward and adds down, which is incorrect
       return null
     }
@@ -193,10 +265,21 @@ export function useGameInput(
       frame,
     }
     
-    // Add to buffer
-    inputBufferRef.current.push(input)
-    setCurrentInputs([...inputBufferRef.current])
-    setInputHistory(prev => [...prev.slice(-19), input]) // Keep last 20 inputs
+    // Check if last input was on the same frame - if so, replace it instead of adding
+    // This handles cases like pressing d+f together which fires separate keydown events
+    // but should only show "df" (or "df+2") not "d, df" (or "df, df+2")
+    const lastInput = inputBufferRef.current[inputBufferRef.current.length - 1]
+    if (lastInput && lastInput.frame === frame) {
+      // Same frame - replace the previous input with the combined state
+      inputBufferRef.current[inputBufferRef.current.length - 1] = input
+      setCurrentInputs([...inputBufferRef.current])
+      setInputHistory(prev => [...prev.slice(0, -1), input]) // Replace last input in history
+    } else {
+      // Different frame - add as new input
+      inputBufferRef.current.push(input)
+      setCurrentInputs([...inputBufferRef.current])
+      setInputHistory(prev => [...prev.slice(-19), input]) // Keep last 20 inputs
+    }
     
     // Update state machine
     const state = stateRef.current
@@ -211,6 +294,16 @@ export function useGameInput(
         state.downFrame = frame
       }
       state.lastDirection = 'd'
+    } else if (direction === 'df' && button === 'none') {
+      // Wavedash detected: f → n → d → df (without punch)
+      if (state.hasForward) {
+        const wavedash = checkWavedashMotion(inputBufferRef.current)
+        if (wavedash) {
+          setLastWavedash(wavedash)
+          onWavedash?.(wavedash)
+        }
+      }
+      state.lastDirection = 'df'
     } else if (direction === 'df' && button === '2') {
       // Check for EWGF completion
       // Allow completion if we have f → df+2 (PEWGF) or f → d → df+2 (EWGF)
@@ -283,7 +376,7 @@ export function useGameInput(
     }, 500) // 500ms input window
     
     lastInputTimeRef.current = now
-  }, [getCurrentFrame, checkDoryaInput, checkWGFMotion, onDoryaAttempt, resetInputs])
+  }, [getCurrentFrame, checkDoryaInput, checkWavedashMotion, checkWGFMotion, onDoryaAttempt, onWavedash, resetInputs])
 
   // Shared key processing logic for both keyboard and touch
   const keyboardKeysRef = useRef<Set<string>>(new Set())
@@ -408,6 +501,7 @@ export function useGameInput(
   return {
     currentInputs,
     lastAttempt,
+    lastWavedash,
     activeKeys,
     resetInputs,
     inputHistory,

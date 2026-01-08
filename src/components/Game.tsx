@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GameMode, ActiveCustomization } from '@/types/game'
+import { GameMode, ActiveCustomization, WavedashAttempt } from '@/types/game'
 import { useGameState } from '@/hooks/useGameState'
 import { useGameInput } from '@/hooks/useGameInput'
 import { useCustomization } from '@/lib/customizationContext'
@@ -93,12 +93,19 @@ export default function Game({ mode, onBack }: GameProps) {
     }
   }, [handleAttempt, audioSettings.sfxEnabled, playDoryaSound, playMhhSound])
 
+  const onWavedash = useCallback((attempt: WavedashAttempt) => {
+    // Wavedash detected - this is the f, n, d, df motion
+    // Currently just for validation/debugging - can add visual feedback later
+    console.log('Wavedash detected:', attempt.isClean ? 'Clean' : 'Sloppy')
+  }, [])
+
   const {
     lastAttempt,
+    lastWavedash,
     activeKeys,
     inputHistory,
     handleTouchInput,
-  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt)
+  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash)
 
   const handleStart = () => {
     setShowResult(false)

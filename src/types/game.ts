@@ -117,6 +117,13 @@ export interface ActiveCustomization {
   dummy: DummyItem
 }
 
+// Wavedash: f, n, d, df (the beginning motion of EWGF without punch)
+export interface WavedashAttempt {
+  inputs: CommandInput[]
+  timestamp: number
+  isClean: boolean // True if executed cleanly without extra inputs
+}
+
 // EWGF requires: f, n, d, df+2 (with 1-frame precision for PEWGF)
 export interface DoryaAttempt {
   inputs: CommandInput[]
