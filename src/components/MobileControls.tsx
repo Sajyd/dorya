@@ -10,10 +10,11 @@ interface MobileControlsProps {
 
 export default function MobileControls({ isPlaying, onInputChange }: MobileControlsProps) {
   const [isMobile, setIsMobile] = useState(false)
-  const activeKeysRef = useRef<Set<string>>(new Set())
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set())
   // Track which touch identifiers are pressing which keys
   const activeTouchesRef = useRef<Map<number, string>>(new Map())
+  // Store refs to button elements for hit testing
+  const buttonRefsRef = useRef<Map<string, HTMLButtonElement>>(new Map())
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -32,81 +33,122 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     // Build set of keys from active touches
     const keysFromTouches = new Set<string>()
     activeTouchesRef.current.forEach((key) => {
-      keysFromTouches.add(key)
+      if (key) keysFromTouches.add(key)
     })
     
-    // Update state
-    activeKeysRef.current = keysFromTouches
+    // Update state and notify parent
     setActiveKeys(new Set(keysFromTouches))
     onInputChange(new Set(keysFromTouches))
   }, [onInputChange])
 
-  const handleTouchStart = useCallback((key: string) => (e: React.TouchEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    // Add all new touches for this key
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i]
-      activeTouchesRef.current.set(touch.identifier, key)
+  // Get which button key a touch point is over
+  const getKeyAtPoint = useCallback((x: number, y: number): string | null => {
+    for (const [key, element] of buttonRefsRef.current.entries()) {
+      if (!element) continue
+      const rect = element.getBoundingClientRect()
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return key
+      }
+    }
+    return null
+  }, [])
+
+  // Process all current touches and update state
+  const processTouches = useCallback((touches: TouchList) => {
+    // Get all current touch identifiers
+    const currentTouchIds = new Set<number>()
+    for (let i = 0; i < touches.length; i++) {
+      currentTouchIds.add(touches[i].identifier)
     }
     
-    syncKeysFromTouches()
-  }, [syncKeysFromTouches])
-
-  const handleTouchEnd = useCallback(() => (e: React.TouchEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    // Remove ended touches
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i]
-      activeTouchesRef.current.delete(touch.identifier)
+    // Remove any tracked touches that are no longer active
+    for (const touchId of activeTouchesRef.current.keys()) {
+      if (!currentTouchIds.has(touchId)) {
+        activeTouchesRef.current.delete(touchId)
+      }
     }
     
-    syncKeysFromTouches()
-  }, [syncKeysFromTouches])
-
-  // Global touch end handler to catch any missed releases
-  useEffect(() => {
-    const handleGlobalTouchEnd = (e: TouchEvent) => {
-      // Remove any touches that ended
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i]
+    // Update each active touch's key based on current position
+    for (let i = 0; i < touches.length; i++) {
+      const touch = touches[i]
+      const key = getKeyAtPoint(touch.clientX, touch.clientY)
+      if (key) {
+        activeTouchesRef.current.set(touch.identifier, key)
+      } else {
+        // Touch is not over any button
         activeTouchesRef.current.delete(touch.identifier)
       }
+    }
+    
+    syncKeysFromTouches()
+  }, [getKeyAtPoint, syncKeysFromTouches])
+
+  // Global touch handlers for reliable multi-touch tracking
+  useEffect(() => {
+    const handleGlobalTouchStart = (e: TouchEvent) => {
+      processTouches(e.touches)
+    }
+
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      processTouches(e.touches)
+    }
+
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      // Process remaining touches (e.touches excludes the ended touch)
+      processTouches(e.touches)
       
       // If no touches remain, clear everything
       if (e.touches.length === 0) {
         activeTouchesRef.current.clear()
+        syncKeysFromTouches()
       }
-      
-      syncKeysFromTouches()
     }
 
-    document.addEventListener('touchend', handleGlobalTouchEnd)
-    document.addEventListener('touchcancel', handleGlobalTouchEnd)
+    document.addEventListener('touchstart', handleGlobalTouchStart, { passive: true })
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: true })
+    document.addEventListener('touchend', handleGlobalTouchEnd, { passive: true })
+    document.addEventListener('touchcancel', handleGlobalTouchEnd, { passive: true })
     
     return () => {
+      document.removeEventListener('touchstart', handleGlobalTouchStart)
+      document.removeEventListener('touchmove', handleGlobalTouchMove)
       document.removeEventListener('touchend', handleGlobalTouchEnd)
       document.removeEventListener('touchcancel', handleGlobalTouchEnd)
     }
-  }, [syncKeysFromTouches])
+  }, [processTouches, syncKeysFromTouches])
 
+  // Register button ref
+  const setButtonRef = useCallback((key: string) => (el: HTMLButtonElement | null) => {
+    if (el) {
+      buttonRefsRef.current.set(key, el)
+    } else {
+      buttonRefsRef.current.delete(key)
+    }
+  }, [])
+
+  // Mouse handlers for desktop testing
+  const mouseKeysRef = useRef<Set<string>>(new Set())
+  
   const handleMouseDown = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
-    activeKeysRef.current.add(key)
-    const newSet = new Set(activeKeysRef.current)
-    setActiveKeys(newSet)
-    onInputChange(newSet)
-  }, [onInputChange])
+    mouseKeysRef.current.add(key)
+    // Combine mouse keys with touch keys
+    const combined = new Set([...activeKeys, ...mouseKeysRef.current])
+    setActiveKeys(combined)
+    onInputChange(combined)
+  }, [activeKeys, onInputChange])
 
   const handleMouseUp = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
-    activeKeysRef.current.delete(key)
-    const newSet = new Set(activeKeysRef.current)
-    setActiveKeys(newSet)
-    onInputChange(newSet)
+    mouseKeysRef.current.delete(key)
+    // Rebuild from touches + remaining mouse keys
+    const keysFromTouches = new Set<string>()
+    activeTouchesRef.current.forEach((k) => {
+      if (k) keysFromTouches.add(k)
+    })
+    const combined = new Set([...keysFromTouches, ...mouseKeysRef.current])
+    setActiveKeys(combined)
+    onInputChange(combined)
   }, [onInputChange])
 
   // Button component for consistent styling
@@ -128,6 +170,7 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     
     return (
       <motion.button
+        ref={setButtonRef(keyCode)}
         className={`
           ${baseSize} rounded-2xl
           flex flex-col items-center justify-center
@@ -141,9 +184,6 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
           border-2
           ${className}
         `}
-        onTouchStart={handleTouchStart(keyCode)}
-        onTouchEnd={handleTouchEnd()}
-        onTouchCancel={handleTouchEnd()}
         onMouseDown={handleMouseDown(keyCode)}
         onMouseUp={handleMouseUp(keyCode)}
         onMouseLeave={handleMouseUp(keyCode)}
@@ -162,6 +202,7 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     
     return (
       <motion.button
+        ref={setButtonRef('KeyK')}
         className={`
           w-24 h-24 rounded-full
           flex flex-col items-center justify-center
@@ -175,9 +216,6 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
           }
           border-[3px]
         `}
-        onTouchStart={handleTouchStart('KeyK')}
-        onTouchEnd={handleTouchEnd()}
-        onTouchCancel={handleTouchEnd()}
         onMouseDown={handleMouseDown('KeyK')}
         onMouseUp={handleMouseUp('KeyK')}
         onMouseLeave={handleMouseUp('KeyK')}
