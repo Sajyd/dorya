@@ -13,7 +13,7 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   const activeKeysRef = useRef<Set<string>>(new Set())
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set())
   // Track which touch identifiers are pressing which keys
-  const touchToKeyRef = useRef<Map<number, string>>(new Map())
+  const activeTouchesRef = useRef<Map<number, string>>(new Map())
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -28,57 +28,86 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const updateKeys = useCallback((key: string, pressed: boolean) => {
-    if (pressed) {
-      activeKeysRef.current.add(key)
-    } else {
-      activeKeysRef.current.delete(key)
+  const syncKeysFromTouches = useCallback(() => {
+    // Build set of keys from active touches
+    const keysFromTouches = new Set<string>()
+    activeTouchesRef.current.forEach((key) => {
+      keysFromTouches.add(key)
+    })
+    
+    // Update state
+    activeKeysRef.current = keysFromTouches
+    setActiveKeys(new Set(keysFromTouches))
+    onInputChange(new Set(keysFromTouches))
+  }, [onInputChange])
+
+  const handleTouchStart = useCallback((key: string) => (e: React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Add all new touches for this key
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i]
+      activeTouchesRef.current.set(touch.identifier, key)
     }
+    
+    syncKeysFromTouches()
+  }, [syncKeysFromTouches])
+
+  const handleTouchEnd = useCallback(() => (e: React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Remove ended touches
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i]
+      activeTouchesRef.current.delete(touch.identifier)
+    }
+    
+    syncKeysFromTouches()
+  }, [syncKeysFromTouches])
+
+  // Global touch end handler to catch any missed releases
+  useEffect(() => {
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      // Remove any touches that ended
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i]
+        activeTouchesRef.current.delete(touch.identifier)
+      }
+      
+      // If no touches remain, clear everything
+      if (e.touches.length === 0) {
+        activeTouchesRef.current.clear()
+      }
+      
+      syncKeysFromTouches()
+    }
+
+    document.addEventListener('touchend', handleGlobalTouchEnd)
+    document.addEventListener('touchcancel', handleGlobalTouchEnd)
+    
+    return () => {
+      document.removeEventListener('touchend', handleGlobalTouchEnd)
+      document.removeEventListener('touchcancel', handleGlobalTouchEnd)
+    }
+  }, [syncKeysFromTouches])
+
+  const handleMouseDown = useCallback((key: string) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    activeKeysRef.current.add(key)
     const newSet = new Set(activeKeysRef.current)
     setActiveKeys(newSet)
     onInputChange(newSet)
   }, [onInputChange])
 
-  const handleTouchStart = useCallback((key: string) => (e: React.TouchEvent) => {
-    e.preventDefault()
-    // Track each touch by its identifier
-    const touches = e.changedTouches
-    for (let i = 0; i < touches.length; i++) {
-      const touch = touches[i]
-      touchToKeyRef.current.set(touch.identifier, key)
-    }
-    updateKeys(key, true)
-  }, [updateKeys])
-
-  const handleTouchEnd = useCallback((key: string) => (e: React.TouchEvent) => {
-    e.preventDefault()
-    // Only release the key if no other touches are holding it
-    const touches = e.changedTouches
-    for (let i = 0; i < touches.length; i++) {
-      const touch = touches[i]
-      touchToKeyRef.current.delete(touch.identifier)
-    }
-    
-    // Check if any remaining touch is still holding this key
-    let stillHeld = false
-    touchToKeyRef.current.forEach((heldKey) => {
-      if (heldKey === key) stillHeld = true
-    })
-    
-    if (!stillHeld) {
-      updateKeys(key, false)
-    }
-  }, [updateKeys])
-
-  const handleMouseDown = useCallback((key: string) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    updateKeys(key, true)
-  }, [updateKeys])
-
   const handleMouseUp = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
-    updateKeys(key, false)
-  }, [updateKeys])
+    activeKeysRef.current.delete(key)
+    const newSet = new Set(activeKeysRef.current)
+    setActiveKeys(newSet)
+    onInputChange(newSet)
+  }, [onInputChange])
 
   // Button component for consistent styling
   const ControlButton = ({ 
@@ -113,8 +142,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
           ${className}
         `}
         onTouchStart={handleTouchStart(keyCode)}
-        onTouchEnd={handleTouchEnd(keyCode)}
-        onTouchCancel={handleTouchEnd(keyCode)}
+        onTouchEnd={handleTouchEnd()}
+        onTouchCancel={handleTouchEnd()}
         onMouseDown={handleMouseDown(keyCode)}
         onMouseUp={handleMouseUp(keyCode)}
         onMouseLeave={handleMouseUp(keyCode)}
@@ -147,8 +176,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
           border-[3px]
         `}
         onTouchStart={handleTouchStart('KeyK')}
-        onTouchEnd={handleTouchEnd('KeyK')}
-        onTouchCancel={handleTouchEnd('KeyK')}
+        onTouchEnd={handleTouchEnd()}
+        onTouchCancel={handleTouchEnd()}
         onMouseDown={handleMouseDown('KeyK')}
         onMouseUp={handleMouseUp('KeyK')}
         onMouseLeave={handleMouseUp('KeyK')}

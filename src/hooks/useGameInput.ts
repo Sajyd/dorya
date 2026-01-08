@@ -112,10 +112,12 @@ export function useGameInput(
 
   const checkDoryaInput = useCallback((inputs: CommandInput[]): DoryaAttempt | null => {
     // EWGF input: f, d, df+2 (14 frame startup)
-    // True PEWGF (13 frame startup): f, df+2 (no separate d) OR f, d~df+2 on same frame
+    // True PEWGF (13 frame startup): f, n, df+2 OR f, d~df+2 on same frame
+    // INVALID: f, df, df+2 (going directly from f to df without neutral or pure d)
     
     // Find the key inputs
     const forwardInput = inputs.find(i => i.direction === 'f' && i.button === 'none')
+    const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
     const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
     const dfPunchInput = inputs.find(i => i.direction === 'df' && i.button === '2')
     
@@ -132,19 +134,25 @@ export function useGameInput(
     let result: 'perfect' | 'good' | 'bad'
     let frameDiff: number
     
-    if (!downInput) {
-      // True PEWGF: f → df+2 (no separate d input, direct slide to df+2)
+    // Check for f, n, df+2 pattern (PEWGF via neutral)
+    const hasNeutralBetween = neutralInput && 
+      neutralInput.timestamp > forwardInput.timestamp && 
+      neutralInput.timestamp < dfPunchInput.timestamp
+    
+    // Check for f, d, df+2 pattern (EWGF via down input)
+    const hasDownBetween = downInput && 
+      downInput.timestamp > forwardInput.timestamp && 
+      downInput.timestamp < dfPunchInput.timestamp
+    
+    if (hasNeutralBetween && !hasDownBetween) {
+      // True PEWGF: f → n → df+2 (return to neutral, then direct to df+2)
       // This is the cleanest perfect electric - 13 frame startup
       result = 'perfect'
       frameDiff = 0
-    } else {
-      // Check sequence order with d input
-      if (forwardInput.timestamp > downInput.timestamp || downInput.timestamp > dfPunchInput.timestamp) {
-        return null
-      }
-      
+    } else if (hasDownBetween) {
+      // f → d → df+2 pattern
       // Calculate timing: frames between d and df+2
-      frameDiff = dfPunchInput.frame - downInput.frame
+      frameDiff = dfPunchInput.frame - downInput!.frame
       
       if (frameDiff === 0) {
         // True PEWGF: d and df+2 on same frame - 13 frame startup
@@ -159,6 +167,10 @@ export function useGameInput(
         // Too slow - WGF not electric
         return null
       }
+    } else {
+      // Invalid motion: f → df → df+2 (no neutral or pure down between f and df+2)
+      // This happens when player holds forward and adds down, which is incorrect
+      return null
     }
     
     return {
