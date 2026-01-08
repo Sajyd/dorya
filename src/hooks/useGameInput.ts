@@ -222,22 +222,34 @@ export function useGameInput(
       result = 'perfect'
       frameDiff = 0
     } else if (hasDownBetween) {
-      // f → (n) → d → df+2 pattern (neutral is optional)
       // Calculate timing: frames between d and df+2
       frameDiff = dfPunchInput.frame - downInput!.frame
       
-      if (frameDiff === 0) {
-        // True PEWGF: d and df+2 on same frame - 13 frame startup
-        result = 'perfect'
-      } else if (frameDiff <= 2) {
-        // Good EWGF - 1-2 frame gap - 14 frame startup
-        result = 'good'
-      } else if (frameDiff <= 5) {
-        // Regular EWGF - 3-5 frame gap - still acceptable but not great
-        result = 'bad'
+      if (!hasNeutralBetween) {
+        // No neutral after forward: f → d → df+2
+        // This is only valid as PEWGF (0-1 frame gap between d and df+2)
+        if (frameDiff <= 1) {
+          // PEWGF: d~df+2 same frame or 1 frame gap
+          result = 'perfect'
+        } else {
+          // Without neutral, anything slower than 1 frame is a MISS
+          return null
+        }
       } else {
-        // Too slow - WGF not electric
-        return null
+        // Has neutral: f → n → d → df+2 (standard EWGF motion)
+        if (frameDiff === 0) {
+          // True PEWGF: d and df+2 on same frame - 13 frame startup
+          result = 'perfect'
+        } else if (frameDiff <= 2) {
+          // Good EWGF - 1-2 frame gap - 14 frame startup
+          result = 'good'
+        } else if (frameDiff <= 5) {
+          // Regular EWGF - 3-5 frame gap - still acceptable but not great
+          result = 'bad'
+        } else {
+          // Too slow - WGF not electric
+          return null
+        }
       }
     } else {
       // Invalid motion: no neutral or pure down between f and df+2
