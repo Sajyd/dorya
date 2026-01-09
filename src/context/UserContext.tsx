@@ -37,32 +37,19 @@ interface UserContextType {
   clearPendingPlayerData: () => void
   
   // Guest functions
-  updateGuestUsername: (newUsername: string) => boolean
+  updateGuestUsername: (newUsername: string) => Promise<boolean>
   
   // Auth functions
   login: (username: string, password: string) => Promise<AuthResult>
-  signup: (username: string, password: string, localData?: { currency: { doryaCoins: number; premiumCoins: number }; inventory: { ownedItems: string[]; selectedStage: string; selectedElectricColor: string; selectedCharacter: string; selectedDummy: string } }) => Promise<AuthResult>
-  logout: () => void
+  signup: (username: string, password: string) => Promise<AuthResult>
+  logout: () => Promise<void>
 }
 
 const UserContext = createContext<UserContextType | null>(null)
 
-const USER_STORAGE_KEY = 'dorya_user'
-const AUTH_STORAGE_KEY = 'dorya_auth'
-
-function generateGuestUsername(): string {
-  const randomNum = Math.floor(Math.random() * 9000000000) + 1000000000
-  return `DORYA_${randomNum}`
-}
-
-function generateGuestId(): string {
-  return `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-}
-
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [authToken, setAuthToken] = useState<string | null>(null)
   const [pendingPlayerData, setPendingPlayerData] = useState<PlayerData | null>(null)
   
   const clearPendingPlayerData = useCallback(() => {
@@ -77,71 +64,37 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const initializeUser = async () => {
-    // Check for stored auth token first
-    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY)
-    if (storedAuth) {
-      try {
-        const authData = JSON.parse(storedAuth)
-        // Verify token with backend
-        const response = await fetch('/api/auth/verify', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authData.token}`
-          },
+    try {
+      // Call the init endpoint - it will check cookies and return user data
+      const response = await fetch('/api/player/init', {
+        method: 'GET',
+        credentials: 'include', // Include cookies
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUser({
+          id: data.user.id,
+          username: data.user.username,
+          isGuest: data.isGuest,
+          createdAt: data.user.createdAt,
         })
         
-        if (response.ok) {
-          const userData = await response.json()
-          setUser({
-            id: userData.id,
-            username: userData.username,
-            isGuest: false,
-            createdAt: userData.createdAt,
-          })
-          setAuthToken(authData.token)
-          // Store player data to be synced by customization context
-          if (userData.playerData) {
-            setPendingPlayerData(userData.playerData)
-          }
-          setIsLoading(false)
-          return
+        if (data.playerData) {
+          setPendingPlayerData(data.playerData)
         }
-      } catch (e) {
-        console.error('Auth verification failed:', e)
-        localStorage.removeItem(AUTH_STORAGE_KEY)
+      } else {
+        console.error('Failed to initialize user')
       }
+    } catch (e) {
+      console.error('User initialization failed:', e)
+    } finally {
+      setIsLoading(false)
     }
-
-    // Fall back to guest user
-    const storedUser = localStorage.getItem(USER_STORAGE_KEY)
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setUser(userData)
-      } catch (e) {
-        console.error('Failed to parse stored user:', e)
-        createGuestUser()
-      }
-    } else {
-      createGuestUser()
-    }
-    setIsLoading(false)
-  }
-
-  const createGuestUser = () => {
-    const guestUser: User = {
-      id: generateGuestId(),
-      username: generateGuestUsername(),
-      isGuest: true,
-      createdAt: new Date().toISOString(),
-    }
-    setUser(guestUser)
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(guestUser))
   }
 
   // Update username for guest users
-  const updateGuestUsername = useCallback((newUsername: string): boolean => {
+  const updateGuestUsername = useCallback(async (newUsername: string): Promise<boolean> => {
     if (!user || !user.isGuest) return false
     
     const cleanUsername = newUsername.trim().toUpperCase().slice(0, 20)
@@ -150,13 +103,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
     // Check for invalid characters
     if (!/^[A-Z0-9_]+$/.test(cleanUsername)) return false
     
-    const updatedUser: User = {
-      ...user,
-      username: cleanUsername,
+    try {
+      const response = await fetch('/api/player/sync', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username: cleanUsername }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUser(prev => prev ? {
+          ...prev,
+          username: data.user.username,
+        } : null)
+        return true
+      }
+      
+      return false
+    } catch (e) {
+      console.error('Failed to update username:', e)
+      return false
     }
-    setUser(updatedUser)
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser))
-    return true
   }, [user])
 
   // Login function
@@ -165,6 +133,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           username: username.trim().toUpperCase(), 
           password 
@@ -177,10 +146,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error || 'Login failed' }
       }
 
-      // Store auth token
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token: data.token }))
-      setAuthToken(data.token)
-      
       // Set user
       setUser({
         id: data.user.id,
@@ -188,9 +153,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         isGuest: false,
         createdAt: data.user.createdAt,
       })
-      
-      // Remove guest user data
-      localStorage.removeItem(USER_STORAGE_KEY)
       
       // Store pending player data for sync
       if (data.playerData) {
@@ -204,20 +166,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Signup function - accepts local data to transfer to server
+  // Signup function
   const signup = useCallback(async (
     username: string, 
     password: string,
-    localData?: { 
-      currency: { doryaCoins: number; premiumCoins: number }
-      inventory: { 
-        ownedItems: string[]
-        selectedStage: string
-        selectedElectricColor: string
-        selectedCharacter: string
-        selectedDummy: string 
-      } 
-    }
   ): Promise<AuthResult> => {
     try {
       const cleanUsername = username.trim().toUpperCase()
@@ -236,11 +188,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           username: cleanUsername, 
           password,
-          // Transfer local data to server
-          localData,
         }),
       })
 
@@ -250,10 +201,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error || 'Signup failed' }
       }
 
-      // Store auth token
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token: data.token }))
-      setAuthToken(data.token)
-      
       // Set user
       setUser({
         id: data.user.id,
@@ -261,9 +208,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         isGuest: false,
         createdAt: data.user.createdAt,
       })
-      
-      // Remove guest user data
-      localStorage.removeItem(USER_STORAGE_KEY)
       
       // Store pending player data for sync
       if (data.playerData) {
@@ -278,10 +222,32 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Logout function
-  const logout = useCallback(() => {
-    localStorage.removeItem(AUTH_STORAGE_KEY)
-    setAuthToken(null)
-    createGuestUser()
+  const logout = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Set user to new guest
+        setUser({
+          id: data.user.id,
+          username: data.user.username,
+          isGuest: true,
+          createdAt: data.user.createdAt,
+        })
+        
+        // Set pending player data for the new guest
+        if (data.playerData) {
+          setPendingPlayerData(data.playerData)
+        }
+      }
+    } catch (e) {
+      console.error('Logout error:', e)
+    }
   }, [])
 
   return (
@@ -310,4 +276,3 @@ export function useUser() {
   }
   return context
 }
-

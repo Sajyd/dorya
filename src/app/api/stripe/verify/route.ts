@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
+import { LOOT_CRATES, openCrate } from '@/lib/customization-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,11 +41,26 @@ export async function GET(request: Request) {
       )
     }
 
-    // Ensure the payment ID is saved (in case webhook hasn't fired yet)
-    if (!purchasedCrate.stripePaymentId && session.payment_intent) {
+    // Ensure the payment ID and items are saved (in case webhook hasn't fired yet)
+    if (!purchasedCrate.stripePaymentId || !purchasedCrate.itemsReceived) {
+      const paymentId = (session.payment_intent as string) || `session_${session.id}`
+      
+      // Pre-determine items if not already set
+      let itemIds = purchasedCrate.itemsReceived as string[] | null
+      if (!itemIds) {
+        const crate = LOOT_CRATES.find(c => c.id === purchasedCrate.crateType)
+        if (crate) {
+          const items = openCrate(crate)
+          itemIds = items.map(item => item.id)
+        }
+      }
+      
       await prisma.purchasedCrate.update({
         where: { id: purchasedCrate.id },
-        data: { stripePaymentId: session.payment_intent as string },
+        data: { 
+          stripePaymentId: paymentId,
+          ...(itemIds && { itemsReceived: itemIds }),
+        },
       })
     }
 

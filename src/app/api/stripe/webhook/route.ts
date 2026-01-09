@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
+import { LOOT_CRATES, openCrate } from '@/lib/customization-data'
 import Stripe from 'stripe'
 
 export async function POST(request: Request) {
@@ -42,17 +43,43 @@ export async function POST(request: Request) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
       
-      // Update the purchased crate with payment ID
-      await prisma.purchasedCrate.updateMany({
-        where: {
-          stripeSessionId: session.id,
-        },
-        data: {
-          stripePaymentId: session.payment_intent as string,
-        },
+      // Find the purchased crate
+      const purchasedCrate = await prisma.purchasedCrate.findFirst({
+        where: { stripeSessionId: session.id },
       })
       
-      console.log(`Payment completed for session ${session.id}`)
+      if (purchasedCrate) {
+        // Get the crate type to determine items
+        const crate = LOOT_CRATES.find(c => c.id === purchasedCrate.crateType)
+        
+        if (crate) {
+          // Pre-determine the items at purchase time
+          const items = openCrate(crate)
+          const itemIds = items.map(item => item.id)
+          
+          // Update the crate with payment ID and pre-determined items
+          await prisma.purchasedCrate.update({
+            where: { id: purchasedCrate.id },
+            data: {
+              stripePaymentId: (session.payment_intent as string) || `session_${session.id}`,
+              itemsReceived: itemIds,
+            },
+          })
+          
+          console.log(`Payment completed for session ${session.id}, items: ${itemIds.join(', ')}`)
+        } else {
+          // Fallback: just set payment ID
+          await prisma.purchasedCrate.update({
+            where: { id: purchasedCrate.id },
+            data: {
+              stripePaymentId: (session.payment_intent as string) || `session_${session.id}`,
+            },
+          })
+          console.log(`Payment completed for session ${session.id}, but crate type not found`)
+        }
+      } else {
+        console.log(`Payment completed for session ${session.id}, but no crate found`)
+      }
       break
     }
     

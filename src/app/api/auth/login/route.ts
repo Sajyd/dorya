@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { createHash, randomBytes } from 'crypto'
+
+const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
+const GUEST_TOKEN_COOKIE = 'dorya_guest_token'
 
 function hashPassword(password: string, salt: string): string {
   return createHash('sha256').update(password + salt).digest('hex')
@@ -71,22 +75,22 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    return NextResponse.json({
+    const ownedItems = inventory.ownedItems as string[] ?? DEFAULT_OWNED_ITEMS
+
+    const response = NextResponse.json({
       success: true,
-      token,
       user: {
         id: player.id,
         username: player.username,
         createdAt: player.createdAt.toISOString(),
       },
-      // Return server data so client can sync (override localStorage)
       playerData: {
         currency: {
           doryaCoins: player.doryaCoins,
           premiumCoins: player.premiumCoins,
         },
         inventory: {
-          ownedItems: inventory.ownedItems ?? DEFAULT_OWNED_ITEMS,
+          ownedItems,
           selectedStage: inventory.selectedStage ?? 'stage_classic',
           selectedElectricColor: inventory.selectedElectricColor ?? 'electric_blue',
           selectedCharacter: inventory.selectedCharacter ?? 'char_mishima',
@@ -94,6 +98,20 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // Set auth token cookie
+    response.cookies.set(AUTH_TOKEN_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    })
+
+    // Clear guest token cookie
+    response.cookies.delete(GUEST_TOKEN_COOKIE)
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
@@ -102,4 +120,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

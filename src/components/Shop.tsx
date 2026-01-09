@@ -93,9 +93,9 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
     }
   }
 
-  const handleCrateAnimationComplete = () => {
+  const handleCrateAnimationComplete = async () => {
     if (openingCrate) {
-      const results = openCrate(openingCrate)
+      const results = await openCrate(openingCrate)
       setCrateResults(results)
     }
   }
@@ -105,14 +105,14 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
     setCrateResults(null)
   }
 
-  const handlePurchaseItem = (item: ShopItem) => {
+  const handlePurchaseItem = async (item: ShopItem) => {
     if (ownsItem(item.id)) return
     if (currency.doryaCoins < item.price) {
       setSelectedItem(item)
       setShowPremiumModal(true)
       return
     }
-    purchaseItem(item)
+    await purchaseItem(item)
   }
 
   const getItemsForTab = (): ShopItem[] => {

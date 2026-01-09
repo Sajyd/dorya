@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { createHash, randomBytes } from 'crypto'
+
+const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
+const GUEST_TOKEN_COOKIE = 'dorya_guest_token'
 
 // Simple password hashing (in production, use bcrypt)
 function hashPassword(password: string, salt: string): string {
@@ -16,8 +20,9 @@ const DEFAULT_OWNED_ITEMS = ['stage_classic', 'electric_blue', 'electric_gold', 
 
 export async function POST(request: NextRequest) {
   try {
+    const cookieStore = await cookies()
     const body = await request.json()
-    const { username, password, localData } = body
+    const { username, password } = body
 
     // Validate input
     if (!username || !password) {
@@ -51,13 +56,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if username exists
-    const existingPlayer = await prisma.player.findUnique({
-      where: { username: cleanUsername },
-      include: { inventory: true },
+    // Check if username exists (by a registered user with password)
+    const existingRegistered = await prisma.player.findFirst({
+      where: { 
+        username: cleanUsername,
+        passwordHash: { not: null },
+      },
     })
 
-    if (existingPlayer && existingPlayer.passwordHash) {
+    if (existingRegistered) {
       return NextResponse.json(
         { error: 'Username already taken' },
         { status: 409 }
@@ -69,116 +76,112 @@ export async function POST(request: NextRequest) {
     const passwordHash = hashPassword(password, salt)
     const token = generateToken()
 
-    // Extract local data to transfer from guest session
-    const guestCoins = Math.max(0, localData?.currency?.doryaCoins ?? 100)
-    const guestPremiumCoins = Math.max(0, localData?.currency?.premiumCoins ?? 0)
-    const guestOwnedItems = localData?.inventory?.ownedItems ?? DEFAULT_OWNED_ITEMS
-    const guestSelectedStage = localData?.inventory?.selectedStage ?? 'stage_classic'
-    const guestSelectedElectricColor = localData?.inventory?.selectedElectricColor ?? 'electric_blue'
-    const guestSelectedCharacter = localData?.inventory?.selectedCharacter ?? 'char_mishima'
-    const guestSelectedDummy = localData?.inventory?.selectedDummy ?? 'dummy_classic'
-
-    // Merge owned items with defaults to ensure defaults are always included
-    const mergedOwnedItems = [...new Set([...DEFAULT_OWNED_ITEMS, ...guestOwnedItems])]
-
-    let player
-    if (existingPlayer) {
-      // Update existing player (from guest submissions) with password
-      // Merge coins and inventory - take the higher value to be fair
-      const mergedCoins = Math.max(existingPlayer.doryaCoins, guestCoins)
-      const mergedPremium = Math.max(existingPlayer.premiumCoins, guestPremiumCoins)
-      const existingItems = (existingPlayer.inventory?.ownedItems as string[]) ?? []
-      const finalOwnedItems = [...new Set([...existingItems, ...mergedOwnedItems])]
-
-      player = await prisma.player.update({
-        where: { id: existingPlayer.id },
-        data: {
-          passwordHash,
-          passwordSalt: salt,
-          authToken: token,
-          doryaCoins: mergedCoins,
-          premiumCoins: mergedPremium,
+    // Check if we have an existing guest session to upgrade
+    const guestToken = cookieStore.get(GUEST_TOKEN_COOKIE)?.value
+    let existingGuestPlayer = null
+    
+    if (guestToken) {
+      existingGuestPlayer = await prisma.player.findFirst({
+        where: { 
+          authToken: guestToken,
+          passwordHash: null, // Guest user
         },
         include: { inventory: true },
       })
+    }
 
-      // Update or create inventory
-      if (existingPlayer.inventory) {
-        await prisma.playerInventory.update({
-          where: { playerId: existingPlayer.id },
+    let player
+    let inventory
+
+    if (existingGuestPlayer) {
+      // Upgrade existing guest player to registered account
+      player = await prisma.player.update({
+        where: { id: existingGuestPlayer.id },
+        data: {
+          username: cleanUsername,
+          passwordHash,
+          passwordSalt: salt,
+          authToken: token,
+        },
+        include: { inventory: true },
+      })
+      inventory = player.inventory
+      
+      // Create inventory if missing
+      if (!inventory) {
+        inventory = await prisma.playerInventory.create({
           data: {
-            ownedItems: finalOwnedItems,
-            selectedStage: guestSelectedStage,
-            selectedElectricColor: guestSelectedElectricColor,
-            selectedCharacter: guestSelectedCharacter,
-            selectedDummy: guestSelectedDummy,
-          },
-        })
-      } else {
-        await prisma.playerInventory.create({
-          data: {
-            playerId: existingPlayer.id,
-            ownedItems: finalOwnedItems,
-            selectedStage: guestSelectedStage,
-            selectedElectricColor: guestSelectedElectricColor,
-            selectedCharacter: guestSelectedCharacter,
-            selectedDummy: guestSelectedDummy,
+            playerId: player.id,
+            ownedItems: DEFAULT_OWNED_ITEMS,
+            selectedStage: 'stage_classic',
+            selectedElectricColor: 'electric_blue',
+            selectedCharacter: 'char_mishima',
+            selectedDummy: 'dummy_classic',
           },
         })
       }
     } else {
-      // Create new player with guest data
+      // Create new registered player
       player = await prisma.player.create({
         data: {
           username: cleanUsername,
           passwordHash,
           passwordSalt: salt,
           authToken: token,
-          doryaCoins: guestCoins,
-          premiumCoins: guestPremiumCoins,
+          doryaCoins: 500, // Starting bonus
+          premiumCoins: 0,
           inventory: {
             create: {
-              ownedItems: mergedOwnedItems,
-              selectedStage: guestSelectedStage,
-              selectedElectricColor: guestSelectedElectricColor,
-              selectedCharacter: guestSelectedCharacter,
-              selectedDummy: guestSelectedDummy,
+              ownedItems: DEFAULT_OWNED_ITEMS,
+              selectedStage: 'stage_classic',
+              selectedElectricColor: 'electric_blue',
+              selectedCharacter: 'char_mishima',
+              selectedDummy: 'dummy_classic',
             },
           },
         },
         include: { inventory: true },
       })
+      inventory = player.inventory
     }
 
-    // Fetch final player data with inventory
-    const finalPlayer = await prisma.player.findUnique({
-      where: { id: player.id },
-      include: { inventory: true },
-    })
+    const ownedItems = (inventory?.ownedItems as string[]) ?? DEFAULT_OWNED_ITEMS
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
-      token,
       user: {
-        id: finalPlayer!.id,
-        username: finalPlayer!.username,
-        createdAt: finalPlayer!.createdAt.toISOString(),
+        id: player.id,
+        username: player.username,
+        createdAt: player.createdAt.toISOString(),
       },
-      // Return the server data so client can sync
       playerData: {
         currency: {
-          doryaCoins: finalPlayer!.doryaCoins,
-          premiumCoins: finalPlayer!.premiumCoins,
+          doryaCoins: player.doryaCoins,
+          premiumCoins: player.premiumCoins,
         },
         inventory: {
-          ownedItems: finalPlayer!.inventory?.ownedItems ?? mergedOwnedItems,
-          selectedStage: finalPlayer!.inventory?.selectedStage ?? guestSelectedStage,
-          selectedElectricColor: finalPlayer!.inventory?.selectedElectricColor ?? guestSelectedElectricColor,
-          selectedCharacter: finalPlayer!.inventory?.selectedCharacter ?? guestSelectedCharacter,
-          selectedDummy: finalPlayer!.inventory?.selectedDummy ?? guestSelectedDummy,
+          ownedItems,
+          selectedStage: inventory?.selectedStage ?? 'stage_classic',
+          selectedElectricColor: inventory?.selectedElectricColor ?? 'electric_blue',
+          selectedCharacter: inventory?.selectedCharacter ?? 'char_mishima',
+          selectedDummy: inventory?.selectedDummy ?? 'dummy_classic',
         },
       },
     })
+
+    // Set auth token cookie
+    response.cookies.set(AUTH_TOKEN_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    })
+
+    // Clear guest token cookie
+    response.cookies.delete(GUEST_TOKEN_COOKIE)
+
+    return response
   } catch (error) {
     console.error('Signup error:', error)
     return NextResponse.json(
@@ -187,4 +190,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

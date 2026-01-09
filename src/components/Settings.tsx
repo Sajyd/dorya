@@ -13,7 +13,7 @@ type SettingsTab = 'profile' | 'login' | 'signup'
 
 export default function Settings({ onBack }: SettingsProps) {
   const { user, isLoggedIn, updateGuestUsername, login, signup, logout } = useUser()
-  const { syncFromServer, getLocalData, resetToDefaults } = useCustomization()
+  const { syncFromServer } = useCustomization()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   
   // Profile state
@@ -71,7 +71,7 @@ export default function Settings({ onBack }: SettingsProps) {
     const result = await login(authUsername, authPassword)
     
     if (result.success) {
-      // Sync server data to local state (override localStorage with server data)
+      // Sync server data to local state
       if (result.playerData) {
         syncFromServer(result.playerData)
       }
@@ -91,10 +91,8 @@ export default function Settings({ onBack }: SettingsProps) {
     setAuthError(null)
     setAuthLoading(true)
     
-    // Get local data to transfer to the new account
-    const localData = getLocalData()
-    
-    const result = await signup(authUsername, authPassword, localData)
+    // Server will upgrade the guest player (identified via cookies) to a registered account
+    const result = await signup(authUsername, authPassword)
     
     if (result.success) {
       // Sync server data back (server may have merged data)
@@ -113,10 +111,10 @@ export default function Settings({ onBack }: SettingsProps) {
     setAuthLoading(false)
   }
 
-  const handleLogout = () => {
-    logout()
-    // Reset customization to defaults for the new guest session
-    resetToDefaults()
+  const handleLogout = async () => {
+    await logout()
+    // The logout endpoint creates a new guest session and returns playerData
+    // which will be synced via pendingPlayerData, so we don't need to reset manually
     setActiveTab('profile')
   }
 

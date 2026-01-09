@@ -121,31 +121,37 @@ function GameApp() {
   const handleOpenCrate = async () => {
     if (!pendingCrate || !user?.username) return
     
-    setOpeningCrate(pendingCrate)
-    setPendingCrate(null)
-  }
-
-  const handleCrateAnimationComplete = async () => {
-    if (!openingCrate || !user?.username) return
-
+    // Fetch items BEFORE starting the animation
     try {
       const res = await fetch('/api/crates/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          crateId: openingCrate.id,
+          crateId: pendingCrate.id,
           username: user.username,
         }),
       })
 
       const data = await res.json()
       if (data.success && data.items) {
+        // Set items first, then start the animation
         setCrateItems(data.items)
+        setOpeningCrate(pendingCrate)
+        setPendingCrate(null)
+      } else {
+        console.error('Failed to open crate:', data.error)
+        // Still close the modal on error
+        setPendingCrate(null)
       }
     } catch (err) {
       console.error('Failed to open crate:', err)
-      setOpeningCrate(null)
+      setPendingCrate(null)
     }
+  }
+
+  const handleCrateAnimationComplete = () => {
+    // Animation complete - items were already fetched in handleOpenCrate
+    // This is now just called when the initial animation finishes
   }
 
   const handleClaimRewards = () => {
@@ -154,9 +160,31 @@ function GameApp() {
   }
 
   // Handler for opening crates from locker
-  const handleOpenLockerCrate = (crate: PendingCrate) => {
-    setOpeningCrate(crate)
-    setScreen('menu')
+  const handleOpenLockerCrate = async (crate: PendingCrate) => {
+    if (!user?.username) return
+    
+    // Fetch items BEFORE starting the animation
+    try {
+      const res = await fetch('/api/crates/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          crateId: crate.id,
+          username: user.username,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success && data.items) {
+        setCrateItems(data.items)
+        setOpeningCrate(crate)
+        setScreen('menu')
+      } else {
+        console.error('Failed to open crate from locker:', data.error)
+      }
+    } catch (err) {
+      console.error('Failed to open crate from locker:', err)
+    }
   }
 
   return (

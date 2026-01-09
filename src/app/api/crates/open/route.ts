@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { LOOT_CRATES, openCrate, getDefaultItems } from '@/lib/customization-data'
+import { LOOT_CRATES, openCrate, getItemById } from '@/lib/customization-data'
 
 export async function POST(request: Request) {
   try {
@@ -55,8 +55,26 @@ export async function POST(request: Request) {
       )
     }
 
-    // Open the crate
-    const items = openCrate(crate)
+    // Get items - either pre-determined (from webhook/verify) or generate now as fallback
+    let itemIds = purchasedCrate.itemsReceived as string[] | null
+    if (!itemIds || itemIds.length === 0) {
+      // Fallback: generate items now if webhook/verify didn't set them
+      const generatedItems = openCrate(crate)
+      itemIds = generatedItems.map(item => item.id)
+    }
+    
+    // Convert item IDs to full item objects
+    const items = itemIds
+      .map(id => getItemById(id))
+      .filter((item): item is NonNullable<typeof item> => item !== undefined)
+    
+    if (items.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid items in crate' },
+        { status: 500 }
+      )
+    }
+    
     const ownedItems = (purchasedCrate.player.inventory?.ownedItems as string[]) || []
     
     // Add new items to inventory
