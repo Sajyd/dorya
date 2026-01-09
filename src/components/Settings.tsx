@@ -11,7 +11,7 @@ interface SettingsProps {
   onBack: () => void
 }
 
-type SettingsTab = 'profile' | 'controls' | 'audio' | 'login' | 'signup'
+type SettingsTab = 'profile' | 'controls' | 'game' | 'login' | 'signup'
 
 // Helper to get display name for key codes
 function getKeyDisplayName(keyCode: string): string {
@@ -253,8 +253,8 @@ export default function Settings({ onBack }: SettingsProps) {
             transition={{ delay: 0.1 }}
           >
             {(isLoggedIn 
-              ? ['profile', 'controls', 'audio'] as SettingsTab[]
-              : ['profile', 'controls', 'audio', 'login', 'signup'] as SettingsTab[]
+              ? ['profile', 'controls', 'game'] as SettingsTab[]
+              : ['profile', 'controls', 'game', 'login', 'signup'] as SettingsTab[]
             ).map((tab) => (
               <button
                 key={tab}
@@ -511,16 +511,16 @@ export default function Settings({ onBack }: SettingsProps) {
               </motion.div>
             )}
 
-            {activeTab === 'audio' && (
+            {activeTab === 'game' && (
               <motion.div
-                key="audio"
+                key="game"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 className="bg-black/50 border border-gray-800 rounded-lg p-8"
               >
                 <h2 className="font-display text-3xl text-center text-white mb-8">
-                  AUDIO & DISPLAY
+                  GAME SETTINGS
                 </h2>
 
                 {/* Graphics Quality */}
@@ -680,7 +680,7 @@ export default function Settings({ onBack }: SettingsProps) {
                 {/* Info */}
                 <div className="mt-6 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
                   <p className="text-gray-600 text-xs font-sans">
-                    Your audio and display settings are saved to your account and sync across devices.
+                    Your game settings are saved to your account and sync across devices.
                   </p>
                 </div>
               </motion.div>

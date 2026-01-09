@@ -26,6 +26,19 @@ export default function ResultScreen({ mode, state, onPlayAgain, onQuit, coinsEa
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rank, setRank] = useState<number | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile/small screen (check both width and height for landscape mode)
+  useEffect(() => {
+    const checkMobile = () => {
+      const isSmallWidth = window.innerWidth < 768
+      const isSmallHeight = window.innerHeight < 700
+      setIsMobile(isSmallWidth || isSmallHeight)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const score = mode === 'DORYA_STREAK' ? state.maxStreak : 
                 mode === 'PEWGF_MINUTE' ? state.perfectCount :
@@ -95,7 +108,13 @@ export default function ResultScreen({ mode, state, onPlayAgain, onQuit, coinsEa
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="text-center max-w-lg mx-auto px-4 md:px-8">
+      <div 
+        className="text-center max-w-lg mx-auto px-4 md:px-8"
+        style={{ 
+          transform: isMobile ? 'scale(0.5)' : 'scale(1)',
+          transformOrigin: 'center center'
+        }}
+      >
         {/* Player name */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
