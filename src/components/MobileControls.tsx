@@ -52,7 +52,7 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   }, [])
 
   // Process all current touches and update state
-  const processTouches = useCallback((touches: TouchList) => {
+  const processTouches = useCallback((touches: TouchList, isStart: boolean = false) => {
     // Build set of current touch IDs
     const currentTouchIds = new Set<number>()
     for (let i = 0; i < touches.length; i++) {
@@ -68,15 +68,18 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     })
     toRemove.forEach(id => activeTouchesRef.current.delete(id))
     
-    // Update/add touches based on current position
-    for (let i = 0; i < touches.length; i++) {
-      const touch = touches[i]
-      const key = getKeyAtPoint(touch.clientX, touch.clientY)
-      if (key) {
-        activeTouchesRef.current.set(touch.identifier, key)
-      } else {
-        // Touch is not over any button - remove it if tracked
-        activeTouchesRef.current.delete(touch.identifier)
+    // Only register NEW touches on touchstart - don't update existing ones
+    // This prevents a held button from switching to another button
+    if (isStart) {
+      for (let i = 0; i < touches.length; i++) {
+        const touch = touches[i]
+        // Only add if this touch isn't already tracked
+        if (!activeTouchesRef.current.has(touch.identifier)) {
+          const key = getKeyAtPoint(touch.clientX, touch.clientY)
+          if (key) {
+            activeTouchesRef.current.set(touch.identifier, key)
+          }
+        }
       }
     }
     
@@ -86,11 +89,11 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   // Global touch handlers for reliable multi-touch tracking
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      processTouches(e.touches)
+      processTouches(e.touches, true) // true = is start, register new touches
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      processTouches(e.touches)
+      processTouches(e.touches, false) // false = just cleanup ended touches, don't add new
     }
 
     const handleTouchEnd = (e: TouchEvent) => {
@@ -100,8 +103,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
         activeTouchesRef.current.clear()
         syncKeysFromTouches()
       } else {
-        // Some touches remain - process them
-        processTouches(e.touches)
+        // Some touches remain - process them (cleanup only)
+        processTouches(e.touches, false)
       }
     }
 
@@ -158,7 +161,7 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
               <motion.button
                 data-mobile-key="KeyS"
                 className={`
-                  w-16 h-16 rounded-2xl
+                  w-20 h-20 rounded-2xl
                   flex flex-col items-center justify-center
                   font-tekken text-lg tracking-wider
                   select-none touch-none
@@ -175,15 +178,15 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
                 whileTap={{ scale: 0.9 }}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <span className="text-xl font-bold">↓</span>
-                <span className="text-[10px] text-gray-500 mt-0.5">DOWN</span>
+                <span className="text-2xl font-bold">↓</span>
+                <span className="text-xs text-gray-500 mt-0.5">DOWN</span>
               </motion.button>
               
               {/* Forward button */}
               <motion.button
                 data-mobile-key="KeyD"
                 className={`
-                  w-16 h-16 rounded-2xl
+                  w-20 h-20 rounded-2xl
                   flex flex-col items-center justify-center
                   font-tekken text-lg tracking-wider
                   select-none touch-none
@@ -200,8 +203,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
                 whileTap={{ scale: 0.9 }}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <span className="text-xl font-bold">→</span>
-                <span className="text-[10px] text-gray-500 mt-0.5">FWD</span>
+                <span className="text-2xl font-bold">→</span>
+                <span className="text-xs text-gray-500 mt-0.5">FWD</span>
               </motion.button>
             </div>
             
@@ -219,7 +222,7 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
           <motion.button
             data-mobile-key="KeyK"
             className={`
-              w-24 h-24 rounded-full
+              w-28 h-28 rounded-full
               flex flex-col items-center justify-center
               font-tekken text-2xl tracking-wider
               select-none touch-none
@@ -237,8 +240,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
             whileTap={{ scale: 0.85 }}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
-            <span className="text-3xl font-black">2</span>
-            <span className="text-[10px] opacity-70">PUNCH</span>
+            <span className="text-4xl font-black">2</span>
+            <span className="text-xs opacity-70">PUNCH</span>
           </motion.button>
         </div>
       </div>
