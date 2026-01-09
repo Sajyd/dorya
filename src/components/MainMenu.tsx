@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { GameMode } from '@/types/game'
 import { useCustomization } from '@/lib/customizationContext'
 import { useUser } from '@/context/UserContext'
-import { useAudio } from '@/context/AudioContext'
+import { useAudio, GraphicsQuality } from '@/context/AudioContext'
 
 interface MainMenuProps {
   onPlay: (mode: GameMode) => void
@@ -25,7 +25,7 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
   const audioSettingsRef = useRef<HTMLDivElement>(null)
   const { currency } = useCustomization()
   const { user, isLoggedIn, isLoading } = useUser()
-  const { settings, setMusicEnabled, setSfxEnabled } = useAudio()
+  const { settings, setMusicEnabled, setSfxEnabled, setGraphicsQuality } = useAudio()
 
   // Track fullscreen state
   useEffect(() => {
@@ -128,7 +128,6 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
                 {isLoggedIn ? '✓ REGISTERED' : 'GUEST'}
               </span>
             </div>
-            <span className="text-gray-600 group-hover:text-gray-400 transition-colors ml-1 hidden md:inline">⚙</span>
           </>
         )}
       </motion.button>
@@ -427,18 +426,40 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
           </svg>
         </motion.button>
 
-        {/* Audio Settings Dropdown */}
+        {/* Settings Dropdown */}
         <AnimatePresence>
           {showAudioSettings && (
             <motion.div
-              className="absolute left-0 bottom-12 md:bottom-14 w-48 md:w-56 bg-black/90 backdrop-blur-md border border-gray-700 rounded-lg p-3 md:p-4 shadow-2xl"
+              className="absolute left-0 bottom-12 md:bottom-14 w-52 md:w-64 bg-black/90 backdrop-blur-md border border-gray-700 rounded-lg p-3 md:p-4 shadow-2xl"
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.9 }}
               transition={{ duration: 0.2 }}
             >
-              <h3 className="font-tekken text-xs md:text-sm text-tekken-gold tracking-wider mb-3 md:mb-4">
-                AUDIO SETTINGS
+              {/* Graphics Quality */}
+              <h3 className="font-tekken text-xs md:text-sm text-tekken-gold tracking-wider mb-2">
+                GRAPHICS
+              </h3>
+              <div className="flex gap-1 mb-4">
+                {(['low', 'medium', 'high'] as GraphicsQuality[]).map((quality) => (
+                  <button
+                    key={quality}
+                    onClick={() => setGraphicsQuality(quality)}
+                    className={`flex-1 px-2 py-1.5 font-tekken text-[9px] md:text-[10px] tracking-wider rounded transition-all duration-200 border ${
+                      settings.graphicsQuality === quality
+                        ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
+                        : 'border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    {quality.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              <div className="border-t border-gray-700 my-3" />
+
+              <h3 className="font-tekken text-xs md:text-sm text-electric-blue tracking-wider mb-2">
+                AUDIO
               </h3>
               
               {/* Music Toggle */}
