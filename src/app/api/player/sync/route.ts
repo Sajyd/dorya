@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       addOwnedItems,
       setSelection,
       keybindings,
+      userSettings,
     } = body
     
     // Build update data for player
@@ -166,6 +167,43 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Handle userSettings update
+    if (userSettings) {
+      const defaultSettings = {
+        musicEnabled: true,
+        sfxEnabled: true,
+        musicVolume: 0.5,
+        sfxVolume: 0.7,
+        showFps: false,
+        graphicsQuality: 'high',
+      }
+      
+      const existingSettings = (player.inventory?.userSettings as typeof defaultSettings) ?? defaultSettings
+      const sanitizedSettings: Record<string, unknown> = { ...existingSettings }
+      
+      // Validate and merge settings
+      if (typeof userSettings.musicEnabled === 'boolean') {
+        sanitizedSettings.musicEnabled = userSettings.musicEnabled
+      }
+      if (typeof userSettings.sfxEnabled === 'boolean') {
+        sanitizedSettings.sfxEnabled = userSettings.sfxEnabled
+      }
+      if (typeof userSettings.musicVolume === 'number') {
+        sanitizedSettings.musicVolume = Math.max(0, Math.min(1, userSettings.musicVolume))
+      }
+      if (typeof userSettings.sfxVolume === 'number') {
+        sanitizedSettings.sfxVolume = Math.max(0, Math.min(1, userSettings.sfxVolume))
+      }
+      if (typeof userSettings.showFps === 'boolean') {
+        sanitizedSettings.showFps = userSettings.showFps
+      }
+      if (['low', 'medium', 'high'].includes(userSettings.graphicsQuality)) {
+        sanitizedSettings.graphicsQuality = userSettings.graphicsQuality
+      }
+      
+      inventoryUpdate.userSettings = sanitizedSettings
+    }
+    
     // Update inventory if needed
     let updatedInventory = player.inventory
     if (Object.keys(inventoryUpdate).length > 0) {
@@ -195,6 +233,21 @@ export async function POST(request: NextRequest) {
       down: 'KeyS',
       punch: 'KeyK',
     }
+    const playerUserSettings = (updatedInventory?.userSettings as {
+      musicEnabled: boolean
+      sfxEnabled: boolean
+      musicVolume: number
+      sfxVolume: number
+      showFps: boolean
+      graphicsQuality: string
+    }) ?? {
+      musicEnabled: true,
+      sfxEnabled: true,
+      musicVolume: 0.5,
+      sfxVolume: 0.7,
+      showFps: false,
+      graphicsQuality: 'high',
+    }
     
     return NextResponse.json({
       success: true,
@@ -210,6 +263,7 @@ export async function POST(request: NextRequest) {
           selectedCharacter: updatedInventory?.selectedCharacter ?? 'char_mishima',
           selectedDummy: updatedInventory?.selectedDummy ?? 'dummy_classic',
           keybindings: playerKeybindings,
+          userSettings: playerUserSettings,
         },
       },
     })

@@ -114,6 +114,29 @@ export const DEFAULT_KEYBINDINGS: KeyBindings = {
   punch: 'KeyK',
 }
 
+// Graphics quality levels
+export type GraphicsQuality = 'low' | 'medium' | 'high'
+
+// User settings for audio/graphics
+export interface UserSettings {
+  musicEnabled: boolean
+  sfxEnabled: boolean
+  musicVolume: number
+  sfxVolume: number
+  showFps: boolean
+  graphicsQuality: GraphicsQuality
+}
+
+// Default user settings
+export const DEFAULT_USER_SETTINGS: UserSettings = {
+  musicEnabled: true,
+  sfxEnabled: true,
+  musicVolume: 0.5,
+  sfxVolume: 0.7,
+  showFps: false,
+  graphicsQuality: 'high',
+}
+
 // Player's inventory
 export interface PlayerInventory {
   ownedItems: string[] // Array of item IDs
@@ -122,6 +145,7 @@ export interface PlayerInventory {
   selectedCharacter: string
   selectedDummy: string
   keybindings: KeyBindings
+  userSettings: UserSettings
 }
 
 // Active customization state for gameplay

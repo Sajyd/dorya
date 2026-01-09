@@ -9,6 +9,8 @@ import {
   CrateType,
   KeyBindings,
   DEFAULT_KEYBINDINGS,
+  UserSettings,
+  DEFAULT_USER_SETTINGS,
 } from '@/types/game'
 import {
   STAGES,
@@ -19,6 +21,7 @@ import {
   rollCrateItems,
 } from './customizationData'
 import { useUser } from '@/context/UserContext'
+import { useAudio } from '@/context/AudioContext'
 
 interface ServerPlayerData {
   currency: {
@@ -32,6 +35,7 @@ interface ServerPlayerData {
     selectedCharacter: string
     selectedDummy: string
     keybindings?: KeyBindings
+    userSettings?: UserSettings
   }
 }
 
@@ -64,6 +68,10 @@ interface CustomizationContextType {
   updateKeybinding: (key: keyof KeyBindings, value: string) => Promise<void>
   resetKeybindings: () => Promise<void>
   
+  // User settings (audio/graphics)
+  userSettings: UserSettings
+  updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>
+  
   // Active customization (resolved items for gameplay)
   activeCustomization: ActiveCustomization
   
@@ -90,6 +98,7 @@ function getDefaultInventory(): PlayerInventory {
     selectedCharacter: 'char_mishima',
     selectedDummy: 'dummy_classic',
     keybindings: { ...DEFAULT_KEYBINDINGS },
+    userSettings: { ...DEFAULT_USER_SETTINGS },
   }
 }
 
@@ -131,11 +140,14 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<PlayerInventory>(getDefaultInventory())
   const [isLoading, setIsLoading] = useState(true)
   const { pendingPlayerData, clearPendingPlayerData } = useUser()
+  const { syncSettings, setOnSettingsChange } = useAudio()
   const debouncedSync = useDebouncedSync()
 
   // Sync from server when user logs in or initializes
   useEffect(() => {
     if (pendingPlayerData) {
+      const newUserSettings = pendingPlayerData.inventory.userSettings || { ...DEFAULT_USER_SETTINGS }
+      
       setCurrency({
         doryaCoins: Math.max(0, pendingPlayerData.currency.doryaCoins),
         premiumCoins: Math.max(0, pendingPlayerData.currency.premiumCoins),
@@ -147,11 +159,32 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         selectedCharacter: pendingPlayerData.inventory.selectedCharacter,
         selectedDummy: pendingPlayerData.inventory.selectedDummy,
         keybindings: pendingPlayerData.inventory.keybindings || { ...DEFAULT_KEYBINDINGS },
+        userSettings: newUserSettings,
       })
+      
+      // Sync settings to AudioContext
+      syncSettings(newUserSettings)
+      
       clearPendingPlayerData()
       setIsLoading(false)
     }
-  }, [pendingPlayerData, clearPendingPlayerData])
+  }, [pendingPlayerData, clearPendingPlayerData, syncSettings])
+  
+  // Set up callback for AudioContext to notify us of settings changes
+  useEffect(() => {
+    setOnSettingsChange((newSettings: UserSettings) => {
+      // Update local inventory and sync to server
+      setInventory(prev => ({
+        ...prev,
+        userSettings: newSettings
+      }))
+      debouncedSync({ userSettings: newSettings })
+    })
+    
+    return () => {
+      setOnSettingsChange(null)
+    }
+  }, [setOnSettingsChange, debouncedSync])
 
   // Currency functions
   const addCoins = useCallback(async (amount: number) => {
@@ -336,6 +369,18 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     await debouncedSync({ keybindings: { ...DEFAULT_KEYBINDINGS } })
   }, [debouncedSync])
 
+  // User settings functions
+  const updateUserSettings = useCallback(async (newSettings: Partial<UserSettings>) => {
+    setInventory(prev => ({
+      ...prev,
+      userSettings: { ...prev.userSettings, ...newSettings }
+    }))
+    
+    // Get updated settings for sync
+    const updatedSettings = { ...inventory.userSettings, ...newSettings }
+    await debouncedSync({ userSettings: updatedSettings })
+  }, [inventory.userSettings, debouncedSync])
+
   // Get active customization
   const activeCustomization: ActiveCustomization = {
     stage: STAGES.find(s => s.id === inventory.selectedStage) || STAGES[0],
@@ -456,6 +501,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
 
   // Sync from server data (used after login/signup)
   const syncFromServer = useCallback((data: ServerPlayerData) => {
+    const newUserSettings = data.inventory.userSettings || { ...DEFAULT_USER_SETTINGS }
+    
     // Override local state with server data
     setCurrency({
       doryaCoins: Math.max(0, data.currency.doryaCoins),
@@ -468,8 +515,12 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
       selectedCharacter: data.inventory.selectedCharacter,
       selectedDummy: data.inventory.selectedDummy,
       keybindings: data.inventory.keybindings || { ...DEFAULT_KEYBINDINGS },
+      userSettings: newUserSettings,
     })
-  }, [])
+    
+    // Sync settings to AudioContext
+    syncSettings(newUserSettings)
+  }, [syncSettings])
 
   // Get local data (used when signing up to transfer to server)
   const getLocalData = useCallback(() => {
@@ -502,6 +553,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         keybindings: inventory.keybindings,
         updateKeybinding,
         resetKeybindings,
+        userSettings: inventory.userSettings,
+        updateUserSettings,
         activeCustomization,
         openCrate,
         openCrateWithPremium,

@@ -65,6 +65,9 @@ model PlayerInventory {
   // Key bindings (stored as JSON: { forward: string, down: string, punch: string })
   keybindings           Json      @default("{\"forward\":\"KeyD\",\"down\":\"KeyS\",\"punch\":\"KeyK\"}")
   
+  // User settings (stored as JSON: { musicEnabled, sfxEnabled, musicVolume, sfxVolume, showFps, graphicsQuality })
+  userSettings          Json      @default("{\"musicEnabled\":true,\"sfxEnabled\":true,\"musicVolume\":0.5,\"sfxVolume\":0.7,\"showFps\":false,\"graphicsQuality\":\"high\"}")
+  
   updatedAt             DateTime  @updatedAt
 }
 

@@ -1,10 +1,50 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GameMode, GameState } from '@/types/game'
+import { GameMode, GameState, KeyBindings, DEFAULT_KEYBINDINGS } from '@/types/game'
 import { useUser } from '@/context/UserContext'
 import { useAudio } from '@/context/AudioContext'
+
+// Helper to get short display name for key codes
+function getKeyDisplayName(keyCode: string): string {
+  if (keyCode.startsWith('Key')) {
+    return keyCode.replace('Key', '')
+  }
+  if (keyCode.startsWith('Digit')) {
+    return keyCode.replace('Digit', '')
+  }
+  const specialKeys: Record<string, string> = {
+    'Space': 'SPC',
+    'ArrowUp': '↑',
+    'ArrowDown': '↓',
+    'ArrowLeft': '←',
+    'ArrowRight': '→',
+    'ShiftLeft': 'LSH',
+    'ShiftRight': 'RSH',
+    'ControlLeft': 'LCT',
+    'ControlRight': 'RCT',
+    'AltLeft': 'LAL',
+    'AltRight': 'RAL',
+    'Enter': 'ENT',
+    'Backspace': 'BSP',
+    'Tab': 'TAB',
+    'Escape': 'ESC',
+    'CapsLock': 'CAP',
+    'Semicolon': ';',
+    'Quote': "'",
+    'Backquote': '`',
+    'Comma': ',',
+    'Period': '.',
+    'Slash': '/',
+    'Backslash': '\\',
+    'BracketLeft': '[',
+    'BracketRight': ']',
+    'Minus': '-',
+    'Equal': '=',
+  }
+  return specialKeys[keyCode] || keyCode
+}
 
 interface GameHUDProps {
   mode: GameMode
@@ -13,6 +53,7 @@ interface GameHUDProps {
   onPause: () => void
   onBack: () => void
   controllerConnected?: boolean
+  keybindings?: KeyBindings
 }
 
 const modeLabels: Record<GameMode, string> = {
@@ -22,10 +63,9 @@ const modeLabels: Record<GameMode, string> = {
   FREESTYLE: 'FREESTYLE',
 }
 
-export default function GameHUD({ mode, state, activeKeys, onPause, onBack, controllerConnected }: GameHUDProps) {
+export default function GameHUD({ mode, state, activeKeys, onPause, onBack, controllerConnected, keybindings = DEFAULT_KEYBINDINGS }: GameHUDProps) {
   const { user } = useUser()
-  const { settings, setShowFps } = useAudio()
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { settings } = useAudio()
   const [fps, setFps] = useState(0)
   const frameTimesRef = useRef<number[]>([])
   const lastFrameTimeRef = useRef(performance.now())
@@ -168,66 +208,6 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
         {/* Right side - Stats and controls */}
         <div className="text-right space-y-2">
           <div className="flex items-center justify-end gap-3">
-            {/* Settings dropdown */}
-            <div className="relative">
-              <button
-                className="w-12 h-12 md:w-10 md:h-10 rounded-full bg-black/60 backdrop-blur-sm border border-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:border-gray-500 transition-all active:scale-95"
-                onClick={() => setSettingsOpen(!settingsOpen)}
-              >
-                <svg 
-                  className="w-6 h-6 md:w-5 md:h-5" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </button>
-              
-              <AnimatePresence>
-                {settingsOpen && (
-                  <>
-                    {/* Backdrop to close dropdown */}
-                    <div 
-                      className="fixed inset-0 z-40" 
-                      onClick={() => setSettingsOpen(false)}
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-14 md:top-12 z-50 bg-black/95 backdrop-blur-md border border-gray-700 rounded-lg p-4 min-w-[180px] shadow-xl"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="font-tekken text-xs tracking-wider text-gray-300">
-                          SHOW FPS
-                        </span>
-                        <button
-                          onClick={() => setShowFps(!settings.showFps)}
-                          className={`w-12 h-6 rounded-full transition-all duration-300 relative flex-shrink-0 ${
-                            settings.showFps 
-                              ? 'bg-tekken-gold' 
-                              : 'bg-gray-700'
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
-                              settings.showFps ? 'left-[26px]' : 'left-[2px]'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-            
             <button
               className="font-tekken text-sm tracking-wider text-gray-500 hover:text-white transition-colors"
               onClick={onPause}
@@ -305,34 +285,34 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
           </motion.div>
         )}
         
-        {/* Direction keys - S and D only */}
+        {/* Direction keys - Down and Forward */}
         <div className="flex gap-1">
           <div className={`
             w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
-            ${isKeyActive('KeyS') 
+            ${isKeyActive(keybindings.down) 
               ? 'border-electric-purple bg-electric-purple/30 text-electric-purple' 
               : 'border-gray-700 bg-black/50 text-gray-600'}
           `}>
-            S
+            {getKeyDisplayName(keybindings.down)}
           </div>
           <div className={`
             w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
-            ${isKeyActive('KeyD') 
+            ${isKeyActive(keybindings.forward) 
               ? 'border-electric-blue bg-electric-blue/30 text-electric-blue' 
               : 'border-gray-700 bg-black/50 text-gray-600'}
           `}>
-            D
+            {getKeyDisplayName(keybindings.forward)}
           </div>
         </div>
 
         {/* Attack button */}
         <div className={`
           w-12 h-12 rounded-full border-2 flex items-center justify-center font-tekken text-lg
-          ${isKeyActive('KeyK') 
+          ${isKeyActive(keybindings.punch) 
             ? 'border-tekken-gold bg-tekken-gold/30 text-tekken-gold shadow-[0_0_20px_rgba(255,215,0,0.5)]' 
             : 'border-gray-700 bg-black/50 text-gray-600'}
         `}>
-          K
+          {getKeyDisplayName(keybindings.punch)}
         </div>
       </div>
     </div>

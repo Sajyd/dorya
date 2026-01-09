@@ -1,35 +1,24 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react'
+import { UserSettings, DEFAULT_USER_SETTINGS, GraphicsQuality } from '@/types/game'
 
-export type GraphicsQuality = 'low' | 'medium' | 'high'
-
-interface AudioSettings {
-  musicEnabled: boolean
-  sfxEnabled: boolean
-  musicVolume: number
-  sfxVolume: number
-  showFps: boolean
-  graphicsQuality: GraphicsQuality
-}
+// Re-export GraphicsQuality for components that import from here
+export type { GraphicsQuality } from '@/types/game'
 
 interface AudioContextType {
-  settings: AudioSettings
+  settings: UserSettings
   setMusicEnabled: (enabled: boolean) => void
   setSfxEnabled: (enabled: boolean) => void
   setMusicVolume: (volume: number) => void
   setSfxVolume: (volume: number) => void
   setShowFps: (show: boolean) => void
   setGraphicsQuality: (quality: GraphicsQuality) => void
-}
-
-const defaultSettings: AudioSettings = {
-  musicEnabled: true,
-  sfxEnabled: true,
-  musicVolume: 0.5,
-  sfxVolume: 0.7,
-  showFps: false,
-  graphicsQuality: 'high',
+  // Sync function to be called by customization context
+  syncSettings: (newSettings: UserSettings) => void
+  // Callback to notify when settings change
+  onSettingsChange: ((settings: UserSettings) => void) | null
+  setOnSettingsChange: (callback: ((settings: UserSettings) => void) | null) => void
 }
 
 const AudioContext = createContext<AudioContextType | null>(null)
@@ -37,17 +26,18 @@ const AudioContext = createContext<AudioContextType | null>(null)
 const STORAGE_KEY = 'dorya-audio-settings'
 
 export function AudioProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<AudioSettings>(defaultSettings)
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS)
   const [isInitialized, setIsInitialized] = useState(false)
+  const onSettingsChangeRef = useRef<((settings: UserSettings) => void) | null>(null)
 
-  // Load settings from localStorage on mount
+  // Load settings from localStorage on mount (fallback for before server sync)
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
         setSettings({
-          ...defaultSettings,
+          ...DEFAULT_USER_SETTINGS,
           ...parsed,
         })
       }
@@ -57,7 +47,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setIsInitialized(true)
   }, [])
 
-  // Save settings to localStorage when they change
+  // Save settings to localStorage when they change (as a backup)
   useEffect(() => {
     if (isInitialized) {
       try {
@@ -68,29 +58,52 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [settings, isInitialized])
 
-  const setMusicEnabled = (enabled: boolean) => {
-    setSettings(prev => ({ ...prev, musicEnabled: enabled }))
-  }
+  // Notify customization context when settings change
+  const updateSettingsAndNotify = useCallback((newSettings: UserSettings) => {
+    setSettings(newSettings)
+    if (onSettingsChangeRef.current) {
+      onSettingsChangeRef.current(newSettings)
+    }
+  }, [])
 
-  const setSfxEnabled = (enabled: boolean) => {
-    setSettings(prev => ({ ...prev, sfxEnabled: enabled }))
-  }
+  const setMusicEnabled = useCallback((enabled: boolean) => {
+    const newSettings = { ...settings, musicEnabled: enabled }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
 
-  const setMusicVolume = (volume: number) => {
-    setSettings(prev => ({ ...prev, musicVolume: Math.max(0, Math.min(1, volume)) }))
-  }
+  const setSfxEnabled = useCallback((enabled: boolean) => {
+    const newSettings = { ...settings, sfxEnabled: enabled }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
 
-  const setSfxVolume = (volume: number) => {
-    setSettings(prev => ({ ...prev, sfxVolume: Math.max(0, Math.min(1, volume)) }))
-  }
+  const setMusicVolume = useCallback((volume: number) => {
+    const newSettings = { ...settings, musicVolume: Math.max(0, Math.min(1, volume)) }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
 
-  const setShowFps = (show: boolean) => {
-    setSettings(prev => ({ ...prev, showFps: show }))
-  }
+  const setSfxVolume = useCallback((volume: number) => {
+    const newSettings = { ...settings, sfxVolume: Math.max(0, Math.min(1, volume)) }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
 
-  const setGraphicsQuality = (quality: GraphicsQuality) => {
-    setSettings(prev => ({ ...prev, graphicsQuality: quality }))
-  }
+  const setShowFps = useCallback((show: boolean) => {
+    const newSettings = { ...settings, showFps: show }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
+
+  const setGraphicsQuality = useCallback((quality: GraphicsQuality) => {
+    const newSettings = { ...settings, graphicsQuality: quality }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
+
+  // Sync settings from customization context (called on init/login)
+  const syncSettings = useCallback((newSettings: UserSettings) => {
+    setSettings(newSettings)
+  }, [])
+
+  const setOnSettingsChange = useCallback((callback: ((settings: UserSettings) => void) | null) => {
+    onSettingsChangeRef.current = callback
+  }, [])
 
   return (
     <AudioContext.Provider
@@ -102,6 +115,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setSfxVolume,
         setShowFps,
         setGraphicsQuality,
+        syncSettings,
+        onSettingsChange: onSettingsChangeRef.current,
+        setOnSettingsChange,
       }}
     >
       {children}
@@ -116,4 +132,3 @@ export function useAudio() {
   }
   return context
 }
-

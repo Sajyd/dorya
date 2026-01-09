@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GameMode } from '@/types/game'
 import { useCustomization } from '@/lib/customizationContext'
 import { useUser } from '@/context/UserContext'
-import { useAudio, GraphicsQuality } from '@/context/AudioContext'
 
 interface MainMenuProps {
   onPlay: (mode: GameMode) => void
@@ -19,13 +18,10 @@ interface MainMenuProps {
 export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, onSettings }: MainMenuProps) {
   const [showModes, setShowModes] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)
-  const [showAudioSettings, setShowAudioSettings] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const audioSettingsRef = useRef<HTMLDivElement>(null)
   const { currency } = useCustomization()
   const { user, isLoggedIn, isLoading } = useUser()
-  const { settings, setMusicEnabled, setSfxEnabled, setGraphicsQuality } = useAudio()
 
   // Track fullscreen state
   useEffect(() => {
@@ -78,23 +74,6 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Close audio settings when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (audioSettingsRef.current && !audioSettingsRef.current.contains(event.target as Node)) {
-        setShowAudioSettings(false)
-      }
-    }
-
-    if (showAudioSettings) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showAudioSettings])
-
   const gameModes: { mode: GameMode; label: string; description: string }[] = [
     { mode: 'DORYA_STREAK', label: 'DORYA STREAK', description: 'Max consecutive Doryas' },
     { mode: 'PEWGF_MINUTE', label: 'PEWGF RUSH', description: 'Perfect electrics in 60 seconds' },
@@ -131,6 +110,19 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
                   {isLoggedIn ? '✓ REGISTERED' : 'GUEST'}
                 </span>
               </div>
+              {/* Settings cog icon */}
+              <svg 
+                className="w-4 h-4 md:w-5 md:h-5 text-gray-500 group-hover:text-tekken-gold transition-colors ml-1" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </>
           )}
         </motion.button>
@@ -396,142 +388,6 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
             )}
           </AnimatePresence>
         </motion.div>
-      </div>
-
-      {/* Audio Settings Button - Bottom Left Corner */}
-      <div 
-        ref={audioSettingsRef}
-        className="absolute left-3 bottom-3 md:left-4 md:bottom-4 z-20"
-      >
-        <motion.button
-          onClick={() => setShowAudioSettings(!showAudioSettings)}
-          className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
-            showAudioSettings 
-              ? 'border-tekken-gold text-tekken-gold' 
-              : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-          }`}
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.8 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <svg 
-            className="w-5 h-5 md:w-6 md:h-6" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </motion.button>
-
-        {/* Settings Dropdown */}
-        <AnimatePresence>
-          {showAudioSettings && (
-            <motion.div
-              className="absolute left-0 bottom-12 md:bottom-14 w-52 md:w-64 bg-black/90 backdrop-blur-md border border-gray-700 rounded-lg p-3 md:p-4 shadow-2xl"
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.9 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Graphics Quality */}
-              <h3 className="font-tekken text-xs md:text-sm text-tekken-gold tracking-wider mb-2">
-                GRAPHICS
-              </h3>
-              <div className="flex gap-1 mb-4">
-                {(['low', 'medium', 'high'] as GraphicsQuality[]).map((quality) => (
-                  <button
-                    key={quality}
-                    onClick={() => setGraphicsQuality(quality)}
-                    className={`flex-1 px-2 py-1.5 font-tekken text-[9px] md:text-[10px] tracking-wider rounded transition-all duration-200 border ${
-                      settings.graphicsQuality === quality
-                        ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
-                        : 'border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
-                    }`}
-                  >
-                    {quality.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-
-              <div className="border-t border-gray-700 my-3" />
-
-              <h3 className="font-tekken text-xs md:text-sm text-electric-blue tracking-wider mb-2">
-                AUDIO
-              </h3>
-              
-              {/* Music Toggle */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <svg 
-                    className="w-4 h-4 md:w-5 md:h-5 text-gray-400" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2"
-                  >
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                  <span className="font-tekken text-[10px] md:text-xs text-gray-300 tracking-wider">MUSIC</span>
-                </div>
-                <button
-                  onClick={() => setMusicEnabled(!settings.musicEnabled)}
-                  className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-all duration-300 relative flex-shrink-0 ${
-                    settings.musicEnabled 
-                      ? 'bg-tekken-gold' 
-                      : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 md:w-5 md:h-5 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
-                      settings.musicEnabled ? 'left-[22px] md:left-[26px]' : 'left-[2px]'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* SFX Toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg 
-                    className="w-4 h-4 md:w-5 md:h-5 text-gray-400" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2"
-                  >
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                  </svg>
-                  <span className="font-tekken text-[10px] md:text-xs text-gray-300 tracking-wider">SFX</span>
-                </div>
-                <button
-                  onClick={() => setSfxEnabled(!settings.sfxEnabled)}
-                  className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-all duration-300 relative flex-shrink-0 ${
-                    settings.sfxEnabled 
-                      ? 'bg-electric-blue' 
-                      : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 md:w-5 md:h-5 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
-                      settings.sfxEnabled ? 'left-[22px] md:left-[26px]' : 'left-[2px]'
-                    }`}
-                  />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Discord Button */}

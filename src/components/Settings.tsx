@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/context/UserContext'
 import { useCustomization } from '@/lib/customizationContext'
+import { useAudio, GraphicsQuality } from '@/context/AudioContext'
 import { KeyBindings, DEFAULT_KEYBINDINGS } from '@/types/game'
 
 interface SettingsProps {
   onBack: () => void
 }
 
-type SettingsTab = 'profile' | 'controls' | 'login' | 'signup'
+type SettingsTab = 'profile' | 'controls' | 'audio' | 'login' | 'signup'
 
 // Helper to get display name for key codes
 function getKeyDisplayName(keyCode: string): string {
@@ -58,6 +59,7 @@ function getKeyDisplayName(keyCode: string): string {
 export default function Settings({ onBack }: SettingsProps) {
   const { user, isLoggedIn, updateGuestUsername, login, signup, logout } = useUser()
   const { syncFromServer, keybindings, updateKeybinding, resetKeybindings } = useCustomization()
+  const { settings: audioSettings, setMusicEnabled, setSfxEnabled, setMusicVolume, setSfxVolume, setShowFps, setGraphicsQuality } = useAudio()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   
   // Profile state
@@ -251,8 +253,8 @@ export default function Settings({ onBack }: SettingsProps) {
             transition={{ delay: 0.1 }}
           >
             {(isLoggedIn 
-              ? ['profile', 'controls'] as SettingsTab[]
-              : ['profile', 'controls', 'login', 'signup'] as SettingsTab[]
+              ? ['profile', 'controls', 'audio'] as SettingsTab[]
+              : ['profile', 'controls', 'audio', 'login', 'signup'] as SettingsTab[]
             ).map((tab) => (
               <button
                 key={tab}
@@ -504,6 +506,181 @@ export default function Settings({ onBack }: SettingsProps) {
                   </p>
                   <p className="text-gray-600 text-xs font-sans mt-2">
                     Your keybindings are saved to your account and sync across devices.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'audio' && (
+              <motion.div
+                key="audio"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-black/50 border border-gray-800 rounded-lg p-8"
+              >
+                <h2 className="font-display text-3xl text-center text-white mb-8">
+                  AUDIO & DISPLAY
+                </h2>
+
+                {/* Graphics Quality */}
+                <div className="mb-8">
+                  <h3 className="font-tekken text-sm text-tekken-gold tracking-wider mb-4">
+                    GRAPHICS QUALITY
+                  </h3>
+                  <div className="flex gap-2">
+                    {(['low', 'medium', 'high'] as GraphicsQuality[]).map((quality) => (
+                      <button
+                        key={quality}
+                        onClick={() => setGraphicsQuality(quality)}
+                        className={`flex-1 px-4 py-3 font-tekken text-sm tracking-wider rounded transition-all duration-200 border-2 ${
+                          audioSettings.graphicsQuality === quality
+                            ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
+                            : 'border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        {quality.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-gray-600 text-xs mt-2 font-sans">
+                    Lower quality improves performance on older devices.
+                  </p>
+                </div>
+
+                {/* Show FPS */}
+                <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-4 mb-4">
+                  <div>
+                    <span className="font-tekken text-sm text-white tracking-wider">SHOW FPS</span>
+                    <p className="text-gray-500 text-xs font-sans mt-1">Display frame rate counter</p>
+                  </div>
+                  <button
+                    onClick={() => setShowFps(!audioSettings.showFps)}
+                    className={`w-14 h-7 rounded-full transition-all duration-300 relative flex-shrink-0 ${
+                      audioSettings.showFps 
+                        ? 'bg-tekken-gold' 
+                        : 'bg-gray-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-6 h-6 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
+                        audioSettings.showFps ? 'left-[30px]' : 'left-[2px]'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="border-t border-gray-700 my-6" />
+
+                {/* Audio Settings */}
+                <h3 className="font-tekken text-sm text-electric-blue tracking-wider mb-4">
+                  AUDIO
+                </h3>
+
+                {/* Music Toggle & Volume */}
+                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <svg 
+                        className="w-5 h-5 text-gray-400" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                      >
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                      <span className="font-tekken text-sm text-white tracking-wider">MUSIC</span>
+                    </div>
+                    <button
+                      onClick={() => setMusicEnabled(!audioSettings.musicEnabled)}
+                      className={`w-14 h-7 rounded-full transition-all duration-300 relative flex-shrink-0 ${
+                        audioSettings.musicEnabled 
+                          ? 'bg-tekken-gold' 
+                          : 'bg-gray-700'
+                      }`}
+                    >
+                      <div
+                        className={`w-6 h-6 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
+                          audioSettings.musicEnabled ? 'left-[30px]' : 'left-[2px]'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {audioSettings.musicEnabled && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-500 text-xs font-tekken w-12">VOL</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={Math.round(audioSettings.musicVolume * 100)}
+                        onChange={(e) => setMusicVolume(parseInt(e.target.value) / 100)}
+                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-tekken-gold"
+                      />
+                      <span className="text-gray-400 text-xs font-mono w-8 text-right">
+                        {Math.round(audioSettings.musicVolume * 100)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* SFX Toggle & Volume */}
+                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <svg 
+                        className="w-5 h-5 text-gray-400" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                      >
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                      </svg>
+                      <span className="font-tekken text-sm text-white tracking-wider">SOUND EFFECTS</span>
+                    </div>
+                    <button
+                      onClick={() => setSfxEnabled(!audioSettings.sfxEnabled)}
+                      className={`w-14 h-7 rounded-full transition-all duration-300 relative flex-shrink-0 ${
+                        audioSettings.sfxEnabled 
+                          ? 'bg-electric-blue' 
+                          : 'bg-gray-700'
+                      }`}
+                    >
+                      <div
+                        className={`w-6 h-6 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
+                          audioSettings.sfxEnabled ? 'left-[30px]' : 'left-[2px]'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {audioSettings.sfxEnabled && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-500 text-xs font-tekken w-12">VOL</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={Math.round(audioSettings.sfxVolume * 100)}
+                        onChange={(e) => setSfxVolume(parseInt(e.target.value) / 100)}
+                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-electric-blue"
+                      />
+                      <span className="text-gray-400 text-xs font-mono w-8 text-right">
+                        {Math.round(audioSettings.sfxVolume * 100)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="mt-6 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
+                  <p className="text-gray-600 text-xs font-sans">
+                    Your audio and display settings are saved to your account and sync across devices.
                   </p>
                 </div>
               </motion.div>

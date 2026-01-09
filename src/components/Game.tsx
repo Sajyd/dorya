@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GameMode, ActiveCustomization, WavedashAttempt } from '@/types/game'
 import { useGameState } from '@/hooks/useGameState'
@@ -13,6 +13,29 @@ import GameHUD from './GameHUD'
 import CommandHistory from './CommandHistory'
 import ResultScreen from './ResultScreen'
 import MobileControls from './MobileControls'
+
+// Helper to get display name for key codes
+function getKeyDisplayName(keyCode: string): string {
+  if (keyCode.startsWith('Key')) {
+    return keyCode.replace('Key', '')
+  }
+  if (keyCode.startsWith('Digit')) {
+    return keyCode.replace('Digit', '')
+  }
+  const specialKeys: Record<string, string> = {
+    'Space': 'SPACE',
+    'ArrowUp': '↑',
+    'ArrowDown': '↓',
+    'ArrowLeft': '←',
+    'ArrowRight': '→',
+    'ShiftLeft': 'L SHIFT',
+    'ShiftRight': 'R SHIFT',
+    'ControlLeft': 'L CTRL',
+    'ControlRight': 'R CTRL',
+    'Enter': 'ENTER',
+  }
+  return specialKeys[keyCode] || keyCode
+}
 
 // Audio refs for sound effects
 const DORYA_SFX_PATH = '/assets/sfx/dorya.ogg'
@@ -188,6 +211,7 @@ export default function Game({ mode, onBack }: GameProps) {
         onPause={pauseGame}
         onBack={handleQuit}
         controllerConnected={controllerConnected}
+        keybindings={keybindings}
       />
 
       {/* Command History - scaled down on mobile */}
@@ -278,7 +302,7 @@ export default function Game({ mode, onBack }: GameProps) {
                     </>
                   ) : (
                     <>
-                      <p>Controls: D → Release → S → S+D+K</p>
+                      <p>Controls: {getKeyDisplayName(keybindings.forward)} → Release → {getKeyDisplayName(keybindings.down)} → {getKeyDisplayName(keybindings.down)}+{getKeyDisplayName(keybindings.forward)}+{getKeyDisplayName(keybindings.punch)}</p>
                       <p className="text-xs mt-1">(Forward, Neutral, Down, Down-Forward+Punch)</p>
                     </>
                   )}

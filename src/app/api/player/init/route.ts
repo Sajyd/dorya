@@ -10,6 +10,14 @@ const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
 const DEFAULT_OWNED_ITEMS = ['stage_classic', 'electric_blue', 'electric_gold', 'char_mishima', 'dummy_classic']
 const DEFAULT_DORYA_COINS = 500
 const DEFAULT_KEYBINDINGS = { forward: 'KeyD', down: 'KeyS', punch: 'KeyK' }
+const DEFAULT_USER_SETTINGS = {
+  musicEnabled: true,
+  sfxEnabled: true,
+  musicVolume: 0.5,
+  sfxVolume: 0.7,
+  showFps: false,
+  graphicsQuality: 'high' as const,
+}
 
 function generateGuestUsername(): string {
   const randomNum = Math.floor(Math.random() * 9000000000) + 1000000000
@@ -36,6 +44,7 @@ export async function GET(request: NextRequest) {
       if (player) {
         const ownedItems = player.inventory?.ownedItems as string[] ?? DEFAULT_OWNED_ITEMS
         const keybindings = (player.inventory?.keybindings as { forward: string; down: string; punch: string }) ?? DEFAULT_KEYBINDINGS
+        const userSettings = (player.inventory?.userSettings as typeof DEFAULT_USER_SETTINGS) ?? DEFAULT_USER_SETTINGS
         
         return NextResponse.json({
           success: true,
@@ -57,6 +66,7 @@ export async function GET(request: NextRequest) {
               selectedCharacter: player.inventory?.selectedCharacter ?? 'char_mishima',
               selectedDummy: player.inventory?.selectedDummy ?? 'dummy_classic',
               keybindings,
+              userSettings,
             },
           },
         })
@@ -77,6 +87,7 @@ export async function GET(request: NextRequest) {
       if (player) {
         const ownedItems = player.inventory?.ownedItems as string[] ?? DEFAULT_OWNED_ITEMS
         const keybindings = (player.inventory?.keybindings as { forward: string; down: string; punch: string }) ?? DEFAULT_KEYBINDINGS
+        const userSettings = (player.inventory?.userSettings as typeof DEFAULT_USER_SETTINGS) ?? DEFAULT_USER_SETTINGS
         
         return NextResponse.json({
           success: true,
@@ -98,6 +109,7 @@ export async function GET(request: NextRequest) {
               selectedCharacter: player.inventory?.selectedCharacter ?? 'char_mishima',
               selectedDummy: player.inventory?.selectedDummy ?? 'dummy_classic',
               keybindings,
+              userSettings,
             },
           },
         })
@@ -148,6 +160,7 @@ export async function GET(request: NextRequest) {
           selectedCharacter: 'char_mishima',
           selectedDummy: 'dummy_classic',
           keybindings: DEFAULT_KEYBINDINGS,
+          userSettings: DEFAULT_USER_SETTINGS,
         },
       },
     })

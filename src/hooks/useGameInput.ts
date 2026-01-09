@@ -405,6 +405,15 @@ export function useGameInput(
   const gamepadKeysRef = useRef<Set<string>>(new Set())
   const lastProcessedDirectionRef = useRef<InputDirection | null>(null)
   
+  // Touch input buffering - to handle multiple touches on the same frame
+  // The browser may fire separate touchstart events for simultaneous touches
+  // We buffer them and process once per frame to ensure all are combined
+  const pendingTouchUpdateRef = useRef<{keys: Set<string>, punchJustPressed: boolean} | null>(null)
+  const touchFrameScheduledRef = useRef(false)
+  const touchRafIdRef = useRef<number | null>(null)
+  const isPlayingRef = useRef(isPlaying)
+  isPlayingRef.current = isPlaying
+  
   // Gamepad state
   const [controllerConnected, setControllerConnected] = useState(false)
   const gamepadIndexRef = useRef<number | null>(null)
@@ -449,8 +458,37 @@ export function useGameInput(
     ])
   }, [])
 
+  // Process buffered touch input - called once per frame via requestAnimationFrame
+  // This ensures all simultaneous touches are combined before processing
+  const processPendingTouchInput = useCallback(() => {
+    touchFrameScheduledRef.current = false
+    touchRafIdRef.current = null
+    
+    // Don't process if game stopped
+    if (!isPlayingRef.current) {
+      pendingTouchUpdateRef.current = null
+      return
+    }
+    
+    const pending = pendingTouchUpdateRef.current
+    if (!pending) return
+    
+    pendingTouchUpdateRef.current = null
+    
+    // Combine all input sources
+    const allKeys = combineAllKeys()
+    setActiveKeys(allKeys)
+    
+    // Only trigger punch processing when punch button is newly pressed
+    const changedKey = pending.punchJustPressed ? keybindings.punch : undefined
+    
+    processKeyState(allKeys, changedKey)
+  }, [combineAllKeys, keybindings.punch, processKeyState])
+
   // Handle touch input from mobile controls
   // Note: Touch controls still use KeyD/KeyS/KeyK internally as virtual keys
+  // This function buffers touch state and schedules processing for the next animation frame
+  // to ensure all simultaneous touches are combined before being processed
   const handleTouchInput = useCallback((touchKeys: Set<string>) => {
     if (!isPlaying) return
     
@@ -464,23 +502,27 @@ export function useGameInput(
     
     touchKeysRef.current = mappedTouchKeys
     
-    // Combine all input sources
-    const allKeys = combineAllKeys()
-    setActiveKeys(allKeys)
+    // Check if punch was just pressed (compare with previous state before this frame's updates)
+    // We need to track this across multiple touch events in the same frame
+    // Note: prevTouchKeys contains MAPPED keys (keybindings.punch), while touchKeys contains raw keys ('KeyK')
+    // So we compare against the mapped key to detect if punch is newly pressed
+    const prevPunchPressed = pendingTouchUpdateRef.current?.punchJustPressed || false
+    const punchJustPressed = prevPunchPressed || (touchKeys.has('KeyK') && !prevTouchKeys.has(keybindings.punch))
     
-    // Find which key changed (for punch detection)
-    let changedKey: string | undefined
-    const mappedPrevTouchKeys = new Set<string>()
-    if (prevTouchKeys.has('KeyD')) mappedPrevTouchKeys.add(keybindings.forward)
-    if (prevTouchKeys.has('KeyS')) mappedPrevTouchKeys.add(keybindings.down)
-    if (prevTouchKeys.has('KeyK')) mappedPrevTouchKeys.add(keybindings.punch)
-    
-    if (touchKeys.has('KeyK') && !prevTouchKeys.has('KeyK')) {
-      changedKey = keybindings.punch
+    // Buffer the touch state - will be processed at end of frame
+    // This accumulates all touch changes within the same frame
+    pendingTouchUpdateRef.current = {
+      keys: mappedTouchKeys,
+      punchJustPressed,
     }
     
-    processKeyState(allKeys, changedKey)
-  }, [isPlaying, processKeyState, combineAllKeys, keybindings])
+    // Schedule processing for end of frame if not already scheduled
+    // Using requestAnimationFrame ensures all touch events in this frame are combined
+    if (!touchFrameScheduledRef.current) {
+      touchFrameScheduledRef.current = true
+      touchRafIdRef.current = requestAnimationFrame(processPendingTouchInput)
+    }
+  }, [isPlaying, keybindings, processPendingTouchInput])
   
   // Handle gamepad input
   // Note: Gamepad uses virtual keys internally, map to keybindings
@@ -680,6 +722,18 @@ export function useGameInput(
 
     return () => clearInterval(interval)
   }, [isPlaying])
+
+  // Cleanup touch RAF on unmount or when game stops
+  useEffect(() => {
+    return () => {
+      if (touchRafIdRef.current !== null) {
+        cancelAnimationFrame(touchRafIdRef.current)
+        touchRafIdRef.current = null
+      }
+      touchFrameScheduledRef.current = false
+      pendingTouchUpdateRef.current = null
+    }
+  }, [])
 
   return {
     currentInputs,

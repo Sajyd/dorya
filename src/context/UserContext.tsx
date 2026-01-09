@@ -25,6 +25,14 @@ interface PlayerData {
       down: string
       punch: string
     }
+    userSettings?: {
+      musicEnabled: boolean
+      sfxEnabled: boolean
+      musicVolume: number
+      sfxVolume: number
+      showFps: boolean
+      graphicsQuality: 'low' | 'medium' | 'high'
+    }
   }
 }
 
