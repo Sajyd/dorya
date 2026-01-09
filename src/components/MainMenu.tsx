@@ -104,81 +104,85 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
 
   return (
     <div className="h-full w-full flex flex-col items-center justify-center relative overflow-hidden px-4">
-      {/* User display - top left */}
-      <motion.button
-        onClick={onSettings}
-        className="absolute top-3 left-3 md:top-4 md:left-4 z-20 flex items-center gap-2 md:gap-3 bg-black/60 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-gray-700 hover:border-tekken-gold transition-all group"
+      {/* User display and Fullscreen button - top left */}
+      <motion.div 
+        className="absolute top-3 left-3 md:top-4 md:left-4 z-20 flex items-center gap-2"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.5 }}
-        whileHover={{ scale: 1.02 }}
       >
-        {isLoading ? (
-          <span className="font-tekken text-gray-500 tracking-wider text-xs md:text-sm">LOADING...</span>
-        ) : (
-          <>
-            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-tekken-gold to-orange-600 flex items-center justify-center">
-              <span className="font-display text-xs md:text-sm text-black">{user?.username?.charAt(0) || '?'}</span>
-            </div>
-            <div className="flex flex-col items-start">
-              <span className="font-tekken text-white tracking-wider text-xs md:text-sm group-hover:text-tekken-gold transition-colors max-w-[80px] md:max-w-none truncate">
-                {user?.username}
-              </span>
-              <span className={`text-[8px] md:text-[10px] font-tekken tracking-wider ${isLoggedIn ? 'text-green-400' : 'text-gray-500'}`}>
-                {isLoggedIn ? '✓ REGISTERED' : 'GUEST'}
-              </span>
-            </div>
-          </>
-        )}
-      </motion.button>
+        <motion.button
+          onClick={onSettings}
+          className="flex items-center gap-2 md:gap-3 bg-black/60 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-gray-700 hover:border-tekken-gold transition-all group"
+          whileHover={{ scale: 1.02 }}
+        >
+          {isLoading ? (
+            <span className="font-tekken text-gray-500 tracking-wider text-xs md:text-sm">LOADING...</span>
+          ) : (
+            <>
+              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-tekken-gold to-orange-600 flex items-center justify-center">
+                <span className="font-display text-xs md:text-sm text-black">{user?.username?.charAt(0) || '?'}</span>
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="font-tekken text-white tracking-wider text-xs md:text-sm group-hover:text-tekken-gold transition-colors max-w-[80px] md:max-w-none truncate">
+                  {user?.username}
+                </span>
+                <span className={`text-[8px] md:text-[10px] font-tekken tracking-wider ${isLoggedIn ? 'text-green-400' : 'text-gray-500'}`}>
+                  {isLoggedIn ? '✓ REGISTERED' : 'GUEST'}
+                </span>
+              </div>
+            </>
+          )}
+        </motion.button>
 
-      {/* Fullscreen Button - Below user button */}
-      <motion.button
-        onClick={toggleFullscreen}
-        className={`absolute top-[60px] left-3 md:top-[72px] md:left-4 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
-          isFullscreen 
-            ? 'border-electric-blue text-electric-blue' 
-            : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-        }`}
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.6 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-      >
-        {isFullscreen ? (
-          <svg 
-            className="w-5 h-5 md:w-6 md:h-6" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M8 3v3a2 2 0 0 1-2 2H3" />
-            <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
-            <path d="M3 16h3a2 2 0 0 1 2 2v3" />
-            <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
-          </svg>
-        ) : (
-          <svg 
-            className="w-5 h-5 md:w-6 md:h-6" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-          </svg>
-        )}
-      </motion.button>
+        {/* Fullscreen Button */}
+        <motion.button
+          onClick={toggleFullscreen}
+          className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black/60 backdrop-blur-sm border flex items-center justify-center transition-all duration-300 ${
+            isFullscreen 
+              ? 'border-electric-blue text-electric-blue' 
+              : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+          }`}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+        >
+          {isFullscreen ? (
+            <svg 
+              className="w-5 h-5 md:w-6 md:h-6" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+              <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+              <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+              <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+            </svg>
+          ) : (
+            <svg 
+              className="w-5 h-5 md:w-6 md:h-6" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+              <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+              <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+            </svg>
+          )}
+        </motion.button>
+      </motion.div>
 
       {/* Currency display - top right */}
       <motion.div 
