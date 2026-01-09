@@ -41,6 +41,9 @@ function getKeyDisplayName(keyCode: string): string {
 const DORYA_SFX_PATH = '/assets/sfx/dorya.ogg'
 const MHH_SFX_PATH = '/assets/sfx/mhh.ogg'
 
+// Audio pool size - limits max concurrent sounds to prevent lag
+const AUDIO_POOL_SIZE = 6
+
 interface GameProps {
   mode: GameMode
   onBack: () => void
@@ -63,30 +66,77 @@ export default function Game({ mode, onBack }: GameProps) {
   // Store current volume for creating new audio instances
   const sfxVolumeRef = useRef(audioSettings.sfxVolume)
   
-  // Update volume ref when settings change
-  useEffect(() => {
-    sfxVolumeRef.current = audioSettings.sfxVolume
-  }, [audioSettings.sfxVolume])
+  // Audio pools to reuse audio instances (prevents memory leaks and lag)
+  const doryaPoolRef = useRef<HTMLAudioElement[]>([])
+  const doryaPoolIndexRef = useRef(0)
+  const mhhPoolRef = useRef<HTMLAudioElement[]>([])
+  const mhhPoolIndexRef = useRef(0)
   
-  // Function to play dorya sound (creates new instance each time for overlapping)
-  const playDoryaSound = useCallback(() => {
-    const audio = new Audio(DORYA_SFX_PATH)
-    audio.volume = sfxVolumeRef.current
-    audio.play().catch(() => {})
-    // Clean up after playback ends
-    audio.onended = () => {
-      audio.remove()
+  // Initialize audio pools once
+  useEffect(() => {
+    // Create dorya sound pool
+    doryaPoolRef.current = Array.from({ length: AUDIO_POOL_SIZE }, () => {
+      const audio = new Audio(DORYA_SFX_PATH)
+      audio.volume = sfxVolumeRef.current
+      return audio
+    })
+    
+    // Create mhh sound pool (smaller, less frequent)
+    mhhPoolRef.current = Array.from({ length: 3 }, () => {
+      const audio = new Audio(MHH_SFX_PATH)
+      audio.volume = sfxVolumeRef.current
+      return audio
+    })
+    
+    // Cleanup on unmount
+    return () => {
+      doryaPoolRef.current.forEach(audio => {
+        audio.pause()
+        audio.src = ''
+      })
+      mhhPoolRef.current.forEach(audio => {
+        audio.pause()
+        audio.src = ''
+      })
+      doryaPoolRef.current = []
+      mhhPoolRef.current = []
     }
   }, [])
   
-  // Function to play mhh sound
-  const playMhhSound = useCallback(() => {
-    const audio = new Audio(MHH_SFX_PATH)
-    audio.volume = sfxVolumeRef.current
+  // Update volume ref and pool volumes when settings change
+  useEffect(() => {
+    sfxVolumeRef.current = audioSettings.sfxVolume
+    doryaPoolRef.current.forEach(audio => {
+      audio.volume = audioSettings.sfxVolume
+    })
+    mhhPoolRef.current.forEach(audio => {
+      audio.volume = audioSettings.sfxVolume
+    })
+  }, [audioSettings.sfxVolume])
+  
+  // Function to play dorya sound using pool (cycles through instances)
+  const playDoryaSound = useCallback(() => {
+    const pool = doryaPoolRef.current
+    if (pool.length === 0) return
+    
+    const audio = pool[doryaPoolIndexRef.current]
+    doryaPoolIndexRef.current = (doryaPoolIndexRef.current + 1) % pool.length
+    
+    // Reset and play (interrupts if still playing, which is fine)
+    audio.currentTime = 0
     audio.play().catch(() => {})
-    audio.onended = () => {
-      audio.remove()
-    }
+  }, [])
+  
+  // Function to play mhh sound using pool
+  const playMhhSound = useCallback(() => {
+    const pool = mhhPoolRef.current
+    if (pool.length === 0) return
+    
+    const audio = pool[mhhPoolIndexRef.current]
+    mhhPoolIndexRef.current = (mhhPoolIndexRef.current + 1) % pool.length
+    
+    audio.currentTime = 0
+    audio.play().catch(() => {})
   }, [])
   
   const { activeCustomization, addCoins, keybindings } = useCustomization()
