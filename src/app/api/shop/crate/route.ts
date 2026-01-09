@@ -91,7 +91,7 @@ export async function POST(request: Request) {
           ownedItems = []
         }
       } else if (Array.isArray(rawOwnedItems)) {
-        ownedItems = rawOwnedItems
+        ownedItems = rawOwnedItems.filter((item): item is string => typeof item === 'string')
       }
     }
     
