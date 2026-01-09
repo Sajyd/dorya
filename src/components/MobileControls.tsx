@@ -13,8 +13,9 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set())
   // Track which touch identifiers are pressing which keys
   const activeTouchesRef = useRef<Map<number, string>>(new Map())
-  // Store refs to button elements for hit testing
-  const buttonRefsRef = useRef<Map<string, HTMLButtonElement>>(new Map())
+  // Ref to store the latest onInputChange to avoid stale closures
+  const onInputChangeRef = useRef(onInputChange)
+  onInputChangeRef.current = onInputChange
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -29,53 +30,52 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Get which button key a touch point is over using data attributes
+  const getKeyAtPoint = useCallback((x: number, y: number): string | null => {
+    const element = document.elementFromPoint(x, y)
+    if (!element) return null
+    
+    // Find the button with data-key attribute
+    const button = element.closest('[data-mobile-key]') as HTMLElement | null
+    return button?.dataset.mobileKey || null
+  }, [])
+
+  // Sync keys from touches and update state
   const syncKeysFromTouches = useCallback(() => {
-    // Build set of keys from active touches
     const keysFromTouches = new Set<string>()
     activeTouchesRef.current.forEach((key) => {
       if (key) keysFromTouches.add(key)
     })
     
-    // Update state and notify parent
     setActiveKeys(new Set(keysFromTouches))
-    onInputChange(new Set(keysFromTouches))
-  }, [onInputChange])
-
-  // Get which button key a touch point is over
-  const getKeyAtPoint = useCallback((x: number, y: number): string | null => {
-    for (const [key, element] of buttonRefsRef.current.entries()) {
-      if (!element) continue
-      const rect = element.getBoundingClientRect()
-      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-        return key
-      }
-    }
-    return null
+    onInputChangeRef.current(new Set(keysFromTouches))
   }, [])
 
   // Process all current touches and update state
   const processTouches = useCallback((touches: TouchList) => {
-    // Get all current touch identifiers
+    // Build set of current touch IDs
     const currentTouchIds = new Set<number>()
     for (let i = 0; i < touches.length; i++) {
       currentTouchIds.add(touches[i].identifier)
     }
     
-    // Remove any tracked touches that are no longer active
-    for (const touchId of activeTouchesRef.current.keys()) {
+    // Remove touches that are no longer on screen
+    const toRemove: number[] = []
+    activeTouchesRef.current.forEach((_, touchId) => {
       if (!currentTouchIds.has(touchId)) {
-        activeTouchesRef.current.delete(touchId)
+        toRemove.push(touchId)
       }
-    }
+    })
+    toRemove.forEach(id => activeTouchesRef.current.delete(id))
     
-    // Update each active touch's key based on current position
+    // Update/add touches based on current position
     for (let i = 0; i < touches.length; i++) {
       const touch = touches[i]
       const key = getKeyAtPoint(touch.clientX, touch.clientY)
       if (key) {
         activeTouchesRef.current.set(touch.identifier, key)
       } else {
-        // Touch is not over any button
+        // Touch is not over any button - remove it if tracked
         activeTouchesRef.current.delete(touch.identifier)
       }
     }
@@ -85,46 +85,38 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
 
   // Global touch handlers for reliable multi-touch tracking
   useEffect(() => {
-    const handleGlobalTouchStart = (e: TouchEvent) => {
+    const handleTouchStart = (e: TouchEvent) => {
       processTouches(e.touches)
     }
 
-    const handleGlobalTouchMove = (e: TouchEvent) => {
+    const handleTouchMove = (e: TouchEvent) => {
       processTouches(e.touches)
     }
 
-    const handleGlobalTouchEnd = (e: TouchEvent) => {
-      // Process remaining touches (e.touches excludes the ended touch)
-      processTouches(e.touches)
-      
-      // If no touches remain, clear everything
+    const handleTouchEnd = (e: TouchEvent) => {
+      // e.touches contains only the remaining touches (ended one is removed)
       if (e.touches.length === 0) {
+        // All touches ended - clear everything
         activeTouchesRef.current.clear()
         syncKeysFromTouches()
+      } else {
+        // Some touches remain - process them
+        processTouches(e.touches)
       }
     }
 
-    document.addEventListener('touchstart', handleGlobalTouchStart, { passive: true })
-    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: true })
-    document.addEventListener('touchend', handleGlobalTouchEnd, { passive: true })
-    document.addEventListener('touchcancel', handleGlobalTouchEnd, { passive: true })
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchmove', handleTouchMove, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: true })
     
     return () => {
-      document.removeEventListener('touchstart', handleGlobalTouchStart)
-      document.removeEventListener('touchmove', handleGlobalTouchMove)
-      document.removeEventListener('touchend', handleGlobalTouchEnd)
-      document.removeEventListener('touchcancel', handleGlobalTouchEnd)
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
+      document.removeEventListener('touchcancel', handleTouchEnd)
     }
   }, [processTouches, syncKeysFromTouches])
-
-  // Register button ref
-  const setButtonRef = useCallback((key: string) => (el: HTMLButtonElement | null) => {
-    if (el) {
-      buttonRefsRef.current.set(key, el)
-    } else {
-      buttonRefsRef.current.delete(key)
-    }
-  }, [])
 
   // Mouse handlers for desktop testing
   const mouseKeysRef = useRef<Set<string>>(new Set())
@@ -132,103 +124,26 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   const handleMouseDown = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
     mouseKeysRef.current.add(key)
-    // Combine mouse keys with touch keys
     const combined = new Set([...activeKeys, ...mouseKeysRef.current])
     setActiveKeys(combined)
-    onInputChange(combined)
-  }, [activeKeys, onInputChange])
+    onInputChangeRef.current(combined)
+  }, [activeKeys])
 
   const handleMouseUp = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
     mouseKeysRef.current.delete(key)
-    // Rebuild from touches + remaining mouse keys
     const keysFromTouches = new Set<string>()
     activeTouchesRef.current.forEach((k) => {
       if (k) keysFromTouches.add(k)
     })
     const combined = new Set([...keysFromTouches, ...mouseKeysRef.current])
     setActiveKeys(combined)
-    onInputChange(combined)
-  }, [onInputChange])
-
-  // Button component for consistent styling
-  const ControlButton = ({ 
-    keyCode, 
-    label, 
-    sublabel,
-    className = '',
-    size = 'normal'
-  }: { 
-    keyCode: string
-    label: string
-    sublabel?: string
-    className?: string
-    size?: 'normal' | 'large'
-  }) => {
-    const isActive = activeKeys.has(keyCode)
-    const baseSize = size === 'large' ? 'w-20 h-20' : 'w-16 h-16'
-    
-    return (
-      <motion.button
-        ref={setButtonRef(keyCode)}
-        className={`
-          ${baseSize} rounded-2xl
-          flex flex-col items-center justify-center
-          font-tekken text-lg tracking-wider
-          select-none touch-none
-          transition-all duration-75
-          ${isActive 
-            ? 'bg-electric-blue/40 border-electric-blue text-electric-blue shadow-[0_0_25px_rgba(0,212,255,0.6)] scale-95' 
-            : 'bg-black/60 border-gray-600 text-gray-400 backdrop-blur-sm'
-          }
-          border-2
-          ${className}
-        `}
-        onMouseDown={handleMouseDown(keyCode)}
-        onMouseUp={handleMouseUp(keyCode)}
-        onMouseLeave={handleMouseUp(keyCode)}
-        whileTap={{ scale: 0.9 }}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
-      >
-        <span className="text-xl font-bold">{label}</span>
-        {sublabel && <span className="text-[10px] text-gray-500 mt-0.5">{sublabel}</span>}
-      </motion.button>
-    )
-  }
-
-  // Punch button with special styling
-  const PunchButton = () => {
-    const isActive = activeKeys.has('KeyK')
-    
-    return (
-      <motion.button
-        ref={setButtonRef('KeyK')}
-        className={`
-          w-24 h-24 rounded-full
-          flex flex-col items-center justify-center
-          font-tekken text-2xl tracking-wider
-          select-none touch-none
-          transition-all duration-75
-          border-3
-          ${isActive 
-            ? 'bg-tekken-gold/40 border-tekken-gold text-tekken-gold shadow-[0_0_40px_rgba(255,215,0,0.7)] scale-95' 
-            : 'bg-black/60 border-tekken-gold/50 text-tekken-gold/70 backdrop-blur-sm'
-          }
-          border-[3px]
-        `}
-        onMouseDown={handleMouseDown('KeyK')}
-        onMouseUp={handleMouseUp('KeyK')}
-        onMouseLeave={handleMouseUp('KeyK')}
-        whileTap={{ scale: 0.85 }}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
-      >
-        <span className="text-3xl font-black">2</span>
-        <span className="text-[10px] opacity-70">PUNCH</span>
-      </motion.button>
-    )
-  }
+    onInputChangeRef.current(combined)
+  }, [])
 
   if (!isMobile || !isPlaying) return null
+
+  const isKeyActive = (key: string) => activeKeys.has(key)
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none pb-safe">
@@ -239,19 +154,55 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
           <div className="relative">
             {/* Direction buttons side by side: Down on left, Forward on right */}
             <div className="flex items-center gap-2">
-              {/* Down button on the left */}
-              <ControlButton 
-                keyCode="KeyS" 
-                label="↓" 
-                sublabel="DOWN"
-              />
+              {/* Down button */}
+              <motion.button
+                data-mobile-key="KeyS"
+                className={`
+                  w-16 h-16 rounded-2xl
+                  flex flex-col items-center justify-center
+                  font-tekken text-lg tracking-wider
+                  select-none touch-none
+                  transition-all duration-75
+                  ${isKeyActive('KeyS')
+                    ? 'bg-electric-blue/40 border-electric-blue text-electric-blue shadow-[0_0_25px_rgba(0,212,255,0.6)] scale-95' 
+                    : 'bg-black/60 border-gray-600 text-gray-400 backdrop-blur-sm'
+                  }
+                  border-2
+                `}
+                onMouseDown={handleMouseDown('KeyS')}
+                onMouseUp={handleMouseUp('KeyS')}
+                onMouseLeave={handleMouseUp('KeyS')}
+                whileTap={{ scale: 0.9 }}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <span className="text-xl font-bold">↓</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">DOWN</span>
+              </motion.button>
               
-              {/* Forward button on the right */}
-              <ControlButton 
-                keyCode="KeyD" 
-                label="→" 
-                sublabel="FWD"
-              />
+              {/* Forward button */}
+              <motion.button
+                data-mobile-key="KeyD"
+                className={`
+                  w-16 h-16 rounded-2xl
+                  flex flex-col items-center justify-center
+                  font-tekken text-lg tracking-wider
+                  select-none touch-none
+                  transition-all duration-75
+                  ${isKeyActive('KeyD')
+                    ? 'bg-electric-blue/40 border-electric-blue text-electric-blue shadow-[0_0_25px_rgba(0,212,255,0.6)] scale-95' 
+                    : 'bg-black/60 border-gray-600 text-gray-400 backdrop-blur-sm'
+                  }
+                  border-2
+                `}
+                onMouseDown={handleMouseDown('KeyD')}
+                onMouseUp={handleMouseUp('KeyD')}
+                onMouseLeave={handleMouseUp('KeyD')}
+                whileTap={{ scale: 0.9 }}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <span className="text-xl font-bold">→</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">FWD</span>
+              </motion.button>
             </div>
             
             {/* Visual hint for df combo */}
@@ -265,12 +216,32 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
 
         {/* Right side - Punch button */}
         <div className="pointer-events-auto">
-          <PunchButton />
+          <motion.button
+            data-mobile-key="KeyK"
+            className={`
+              w-24 h-24 rounded-full
+              flex flex-col items-center justify-center
+              font-tekken text-2xl tracking-wider
+              select-none touch-none
+              transition-all duration-75
+              border-3
+              ${isKeyActive('KeyK')
+                ? 'bg-tekken-gold/40 border-tekken-gold text-tekken-gold shadow-[0_0_40px_rgba(255,215,0,0.7)] scale-95' 
+                : 'bg-black/60 border-tekken-gold/50 text-tekken-gold/70 backdrop-blur-sm'
+              }
+              border-[3px]
+            `}
+            onMouseDown={handleMouseDown('KeyK')}
+            onMouseUp={handleMouseUp('KeyK')}
+            onMouseLeave={handleMouseUp('KeyK')}
+            whileTap={{ scale: 0.85 }}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-3xl font-black">2</span>
+            <span className="text-[10px] opacity-70">PUNCH</span>
+          </motion.button>
         </div>
       </div>
     </div>
   )
 }
-
-
-
