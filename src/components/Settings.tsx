@@ -1,19 +1,63 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/context/UserContext'
 import { useCustomization } from '@/lib/customizationContext'
+import { KeyBindings, DEFAULT_KEYBINDINGS } from '@/types/game'
 
 interface SettingsProps {
   onBack: () => void
 }
 
-type SettingsTab = 'profile' | 'login' | 'signup'
+type SettingsTab = 'profile' | 'controls' | 'login' | 'signup'
+
+// Helper to get display name for key codes
+function getKeyDisplayName(keyCode: string): string {
+  // Handle letter keys
+  if (keyCode.startsWith('Key')) {
+    return keyCode.replace('Key', '')
+  }
+  // Handle digit keys
+  if (keyCode.startsWith('Digit')) {
+    return keyCode.replace('Digit', '')
+  }
+  // Handle special keys
+  const specialKeys: Record<string, string> = {
+    'Space': 'SPACE',
+    'ArrowUp': '↑',
+    'ArrowDown': '↓',
+    'ArrowLeft': '←',
+    'ArrowRight': '→',
+    'ShiftLeft': 'L SHIFT',
+    'ShiftRight': 'R SHIFT',
+    'ControlLeft': 'L CTRL',
+    'ControlRight': 'R CTRL',
+    'AltLeft': 'L ALT',
+    'AltRight': 'R ALT',
+    'Enter': 'ENTER',
+    'Backspace': 'BACKSPACE',
+    'Tab': 'TAB',
+    'Escape': 'ESC',
+    'CapsLock': 'CAPS',
+    'Semicolon': ';',
+    'Quote': "'",
+    'Backquote': '`',
+    'Comma': ',',
+    'Period': '.',
+    'Slash': '/',
+    'Backslash': '\\',
+    'BracketLeft': '[',
+    'BracketRight': ']',
+    'Minus': '-',
+    'Equal': '=',
+  }
+  return specialKeys[keyCode] || keyCode
+}
 
 export default function Settings({ onBack }: SettingsProps) {
   const { user, isLoggedIn, updateGuestUsername, login, signup, logout } = useUser()
-  const { syncFromServer } = useCustomization()
+  const { syncFromServer, keybindings, updateKeybinding, resetKeybindings } = useCustomization()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   
   // Profile state
@@ -27,6 +71,44 @@ export default function Settings({ onBack }: SettingsProps) {
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
   const [authSuccess, setAuthSuccess] = useState(false)
+  
+  // Keybinding state
+  const [listeningFor, setListeningFor] = useState<keyof KeyBindings | null>(null)
+  const [keybindingSaved, setKeybindingSaved] = useState(false)
+  
+  // Handle keybinding capture
+  const handleKeyCapture = useCallback((e: KeyboardEvent) => {
+    if (!listeningFor) return
+    
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Don't allow Escape - it's used to cancel
+    if (e.code === 'Escape') {
+      setListeningFor(null)
+      return
+    }
+    
+    // Update the keybinding
+    updateKeybinding(listeningFor, e.code)
+    setListeningFor(null)
+    setKeybindingSaved(true)
+    setTimeout(() => setKeybindingSaved(false), 2000)
+  }, [listeningFor, updateKeybinding])
+  
+  // Add/remove key listener for keybinding capture
+  useEffect(() => {
+    if (listeningFor) {
+      window.addEventListener('keydown', handleKeyCapture, true)
+      return () => window.removeEventListener('keydown', handleKeyCapture, true)
+    }
+  }, [listeningFor, handleKeyCapture])
+  
+  const handleResetKeybindings = async () => {
+    await resetKeybindings()
+    setKeybindingSaved(true)
+    setTimeout(() => setKeybindingSaved(false), 2000)
+  }
 
   const handleUsernameChange = async () => {
     setUsernameError(null)
@@ -162,36 +244,38 @@ export default function Settings({ onBack }: SettingsProps) {
           </motion.h1>
 
           {/* Tab navigation */}
-          {!isLoggedIn && (
-            <motion.div 
-              className="flex justify-center gap-2 mb-8"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              {(['profile', 'login', 'signup'] as SettingsTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => {
-                    setActiveTab(tab)
-                    setAuthError(null)
-                    setAuthUsername('')
-                    setAuthPassword('')
-                  }}
-                  className={`
-                    px-5 py-2 font-tekken text-sm tracking-wider transition-all duration-300
-                    border-2 rounded-sm
-                    ${activeTab === tab
-                      ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
-                      : 'border-gray-700 text-gray-500 hover:border-gray-500'
-                    }
-                  `}
-                >
-                  {tab.toUpperCase()}
-                </button>
-              ))}
-            </motion.div>
-          )}
+          <motion.div 
+            className="flex justify-center gap-2 mb-8 flex-wrap"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1 }}
+          >
+            {(isLoggedIn 
+              ? ['profile', 'controls'] as SettingsTab[]
+              : ['profile', 'controls', 'login', 'signup'] as SettingsTab[]
+            ).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab)
+                  setAuthError(null)
+                  setAuthUsername('')
+                  setAuthPassword('')
+                  setListeningFor(null)
+                }}
+                className={`
+                  px-5 py-2 font-tekken text-sm tracking-wider transition-all duration-300
+                  border-2 rounded-sm
+                  ${activeTab === tab
+                    ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
+                    : 'border-gray-700 text-gray-500 hover:border-gray-500'
+                  }
+                `}
+              >
+                {tab.toUpperCase()}
+              </button>
+            ))}
+          </motion.div>
 
           <AnimatePresence mode="wait">
             {activeTab === 'profile' && (
@@ -312,6 +396,116 @@ export default function Settings({ onBack }: SettingsProps) {
                     </button>
                   </div>
                 )}
+              </motion.div>
+            )}
+
+            {activeTab === 'controls' && (
+              <motion.div
+                key="controls"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-black/50 border border-gray-800 rounded-lg p-8"
+              >
+                <h2 className="font-display text-3xl text-center text-white mb-2">
+                  CONTROLS
+                </h2>
+                <p className="text-gray-500 text-sm text-center mb-8 font-sans">
+                  Click a key to rebind. Press ESC to cancel.
+                </p>
+
+                {/* Keybinding rows */}
+                <div className="space-y-4 mb-8">
+                  {/* Forward */}
+                  <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                    <div>
+                      <span className="font-tekken text-sm text-tekken-gold tracking-wider">FORWARD</span>
+                      <p className="text-gray-500 text-xs font-sans mt-1">Move forward / Crouch dash</p>
+                    </div>
+                    <button
+                      onClick={() => setListeningFor('forward')}
+                      className={`
+                        px-6 py-3 min-w-[100px] font-tekken text-lg tracking-wider rounded transition-all
+                        ${listeningFor === 'forward'
+                          ? 'bg-electric-blue/30 border-2 border-electric-blue text-electric-blue animate-pulse'
+                          : 'bg-gray-800 border-2 border-gray-600 text-white hover:border-tekken-gold'
+                        }
+                      `}
+                    >
+                      {listeningFor === 'forward' ? '...' : getKeyDisplayName(keybindings.forward)}
+                    </button>
+                  </div>
+
+                  {/* Down */}
+                  <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                    <div>
+                      <span className="font-tekken text-sm text-tekken-gold tracking-wider">DOWN</span>
+                      <p className="text-gray-500 text-xs font-sans mt-1">Crouch / Part of EWGF motion</p>
+                    </div>
+                    <button
+                      onClick={() => setListeningFor('down')}
+                      className={`
+                        px-6 py-3 min-w-[100px] font-tekken text-lg tracking-wider rounded transition-all
+                        ${listeningFor === 'down'
+                          ? 'bg-electric-blue/30 border-2 border-electric-blue text-electric-blue animate-pulse'
+                          : 'bg-gray-800 border-2 border-gray-600 text-white hover:border-tekken-gold'
+                        }
+                      `}
+                    >
+                      {listeningFor === 'down' ? '...' : getKeyDisplayName(keybindings.down)}
+                    </button>
+                  </div>
+
+                  {/* Punch (2) */}
+                  <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                    <div>
+                      <span className="font-tekken text-sm text-tekken-gold tracking-wider">PUNCH (2)</span>
+                      <p className="text-gray-500 text-xs font-sans mt-1">Right punch for EWGF</p>
+                    </div>
+                    <button
+                      onClick={() => setListeningFor('punch')}
+                      className={`
+                        px-6 py-3 min-w-[100px] font-tekken text-lg tracking-wider rounded transition-all
+                        ${listeningFor === 'punch'
+                          ? 'bg-electric-blue/30 border-2 border-electric-blue text-electric-blue animate-pulse'
+                          : 'bg-gray-800 border-2 border-gray-600 text-white hover:border-tekken-gold'
+                        }
+                      `}
+                    >
+                      {listeningFor === 'punch' ? '...' : getKeyDisplayName(keybindings.punch)}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Saved message */}
+                {keybindingSaved && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-green-400 text-sm text-center font-tekken mb-4"
+                  >
+                    ✓ Controls saved!
+                  </motion.p>
+                )}
+
+                {/* Reset button */}
+                <button
+                  onClick={handleResetKeybindings}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 text-gray-400 font-tekken tracking-wider rounded hover:bg-gray-700/50 hover:text-white transition-all"
+                >
+                  RESET TO DEFAULTS
+                </button>
+
+                {/* Default keys info */}
+                <div className="mt-6 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
+                  <p className="text-gray-500 text-xs font-sans">
+                    <span className="text-gray-400 font-tekken">DEFAULT KEYS:</span>{' '}
+                    D (Forward), S (Down), K (Punch)
+                  </p>
+                  <p className="text-gray-600 text-xs font-sans mt-2">
+                    Your keybindings are saved to your account and sync across devices.
+                  </p>
+                </div>
               </motion.div>
             )}
 

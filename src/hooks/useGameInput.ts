@@ -1,21 +1,7 @@
 'use client'
 
-import { useEffect, useCallback, useRef, useState } from 'react'
-import { CommandInput, DoryaAttempt, WavedashAttempt, InputDirection, InputButton } from '@/types/game'
-
-// Key mappings - using fighting game standard layout
-const DIRECTION_KEYS: Record<string, InputDirection> = {
-  'KeyD': 'f',  // Forward
-  'KeyS': 'd',  // Down
-  // Down-forward is S+D pressed together
-}
-
-const BUTTON_KEYS: Record<string, InputButton> = {
-  'KeyK': '2',  // Right punch (2 in Tekken notation)
-}
-
-// Valid keys that the game accepts
-const VALID_KEYS = new Set(['KeyD', 'KeyS', 'KeyK'])
+import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
+import { CommandInput, DoryaAttempt, WavedashAttempt, InputDirection, InputButton, KeyBindings, DEFAULT_KEYBINDINGS } from '@/types/game'
 
 // Gamepad button mappings (standard gamepad layout)
 // https://w3c.github.io/gamepad/#remapping
@@ -41,8 +27,14 @@ interface UseGameInputReturn {
 export function useGameInput(
   isPlaying: boolean,
   onDoryaAttempt: (attempt: DoryaAttempt) => void,
-  onWavedash?: (attempt: WavedashAttempt) => void
+  onWavedash?: (attempt: WavedashAttempt) => void,
+  customKeybindings?: KeyBindings
 ): UseGameInputReturn {
+  // Memoize keybindings to prevent unnecessary re-renders
+  const keybindings = useMemo(() => customKeybindings || DEFAULT_KEYBINDINGS, [customKeybindings])
+  
+  // Generate valid keys set from keybindings
+  const validKeys = useMemo(() => new Set([keybindings.forward, keybindings.down, keybindings.punch]), [keybindings])
   const [currentInputs, setCurrentInputs] = useState<CommandInput[]>([])
   const [lastAttempt, setLastAttempt] = useState<DoryaAttempt | null>(null)
   const [lastWavedash, setLastWavedash] = useState<WavedashAttempt | null>(null)
@@ -419,10 +411,10 @@ export function useGameInput(
   const lastPunchPressedRef = useRef(false)
 
   const processKeyState = useCallback((allKeys: Set<string>, changedKey?: string) => {
-    // Check for directions
-    const isDown = allKeys.has('KeyS')
-    const isForward = allKeys.has('KeyD')
-    const isPunch = changedKey === 'KeyK' && allKeys.has('KeyK')
+    // Check for directions using custom keybindings
+    const isDown = allKeys.has(keybindings.down)
+    const isForward = allKeys.has(keybindings.forward)
+    const isPunch = changedKey === keybindings.punch && allKeys.has(keybindings.punch)
     
     // Determine current direction
     let direction: InputDirection = 'n'
@@ -446,7 +438,7 @@ export function useGameInput(
       processInput('n', 'none')
       lastProcessedDirectionRef.current = 'n'
     }
-  }, [processInput])
+  }, [processInput, keybindings])
 
   // Combine all input sources (keyboard, touch, gamepad)
   const combineAllKeys = useCallback(() => {
@@ -458,11 +450,19 @@ export function useGameInput(
   }, [])
 
   // Handle touch input from mobile controls
+  // Note: Touch controls still use KeyD/KeyS/KeyK internally as virtual keys
   const handleTouchInput = useCallback((touchKeys: Set<string>) => {
     if (!isPlaying) return
     
     const prevTouchKeys = new Set(touchKeysRef.current)
-    touchKeysRef.current = touchKeys
+    
+    // Map virtual touch keys to actual keybindings
+    const mappedTouchKeys = new Set<string>()
+    if (touchKeys.has('KeyD')) mappedTouchKeys.add(keybindings.forward)
+    if (touchKeys.has('KeyS')) mappedTouchKeys.add(keybindings.down)
+    if (touchKeys.has('KeyK')) mappedTouchKeys.add(keybindings.punch)
+    
+    touchKeysRef.current = mappedTouchKeys
     
     // Combine all input sources
     const allKeys = combineAllKeys()
@@ -470,33 +470,40 @@ export function useGameInput(
     
     // Find which key changed (for punch detection)
     let changedKey: string | undefined
-    const touchKeysArray = Array.from(touchKeys)
-    for (let i = 0; i < touchKeysArray.length; i++) {
-      const key = touchKeysArray[i]
-      if (!prevTouchKeys.has(key)) {
-        changedKey = key
-        break
-      }
+    const mappedPrevTouchKeys = new Set<string>()
+    if (prevTouchKeys.has('KeyD')) mappedPrevTouchKeys.add(keybindings.forward)
+    if (prevTouchKeys.has('KeyS')) mappedPrevTouchKeys.add(keybindings.down)
+    if (prevTouchKeys.has('KeyK')) mappedPrevTouchKeys.add(keybindings.punch)
+    
+    if (touchKeys.has('KeyK') && !prevTouchKeys.has('KeyK')) {
+      changedKey = keybindings.punch
     }
     
     processKeyState(allKeys, changedKey)
-  }, [isPlaying, processKeyState, combineAllKeys])
+  }, [isPlaying, processKeyState, combineAllKeys, keybindings])
   
   // Handle gamepad input
+  // Note: Gamepad uses virtual keys internally, map to keybindings
   const handleGamepadInput = useCallback((newGamepadKeys: Set<string>, punchJustPressed: boolean) => {
     if (!isPlaying) return
     
-    gamepadKeysRef.current = newGamepadKeys
+    // Map virtual gamepad keys to actual keybindings
+    const mappedGamepadKeys = new Set<string>()
+    if (newGamepadKeys.has('KeyD')) mappedGamepadKeys.add(keybindings.forward)
+    if (newGamepadKeys.has('KeyS')) mappedGamepadKeys.add(keybindings.down)
+    if (newGamepadKeys.has('KeyK')) mappedGamepadKeys.add(keybindings.punch)
+    
+    gamepadKeysRef.current = mappedGamepadKeys
     
     // Combine all input sources
     const allKeys = combineAllKeys()
     setActiveKeys(allKeys)
     
     // Only trigger punch processing when punch button is newly pressed
-    const changedKey = punchJustPressed ? 'KeyK' : undefined
+    const changedKey = punchJustPressed ? keybindings.punch : undefined
     
     processKeyState(allKeys, changedKey)
-  }, [isPlaying, processKeyState, combineAllKeys])
+  }, [isPlaying, processKeyState, combineAllKeys, keybindings])
 
   // Gamepad connection handlers
   useEffect(() => {
@@ -628,8 +635,8 @@ export function useGameInput(
       if (e.repeat) return
       
       const code = e.code
-      // Only process valid game keys (D, S, K)
-      if (!VALID_KEYS.has(code)) return
+      // Only process valid game keys based on current keybindings
+      if (!validKeys.has(code)) return
       
       keyboardKeysRef.current.add(code)
       
@@ -642,8 +649,8 @@ export function useGameInput(
 
     const handleKeyUp = (e: KeyboardEvent) => {
       const code = e.code
-      // Only process valid game keys (D, S, K)
-      if (!VALID_KEYS.has(code)) return
+      // Only process valid game keys based on current keybindings
+      if (!validKeys.has(code)) return
       
       keyboardKeysRef.current.delete(code)
       
@@ -661,7 +668,7 @@ export function useGameInput(
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [isPlaying, processKeyState, combineAllKeys])
+  }, [isPlaying, processKeyState, combineAllKeys, validKeys])
 
   // Frame counter
   useEffect(() => {

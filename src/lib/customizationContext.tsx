@@ -7,6 +7,8 @@ import {
   ActiveCustomization,
   ShopItem,
   CrateType,
+  KeyBindings,
+  DEFAULT_KEYBINDINGS,
 } from '@/types/game'
 import {
   STAGES,
@@ -29,6 +31,7 @@ interface ServerPlayerData {
     selectedElectricColor: string
     selectedCharacter: string
     selectedDummy: string
+    keybindings?: KeyBindings
   }
 }
 
@@ -56,6 +59,11 @@ interface CustomizationContextType {
   selectCharacter: (id: string) => Promise<void>
   selectDummy: (id: string) => Promise<void>
   
+  // Keybindings
+  keybindings: KeyBindings
+  updateKeybinding: (key: keyof KeyBindings, value: string) => Promise<void>
+  resetKeybindings: () => Promise<void>
+  
   // Active customization (resolved items for gameplay)
   activeCustomization: ActiveCustomization
   
@@ -81,6 +89,7 @@ function getDefaultInventory(): PlayerInventory {
     selectedElectricColor: 'electric_blue',
     selectedCharacter: 'char_mishima',
     selectedDummy: 'dummy_classic',
+    keybindings: { ...DEFAULT_KEYBINDINGS },
   }
 }
 
@@ -137,6 +146,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         selectedElectricColor: pendingPlayerData.inventory.selectedElectricColor,
         selectedCharacter: pendingPlayerData.inventory.selectedCharacter,
         selectedDummy: pendingPlayerData.inventory.selectedDummy,
+        keybindings: pendingPlayerData.inventory.keybindings || { ...DEFAULT_KEYBINDINGS },
       })
       clearPendingPlayerData()
       setIsLoading(false)
@@ -260,21 +270,26 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
 
   // Add items to inventory (used after opening Stripe crates - server already updated)
   const addItemsToInventory = useCallback((itemIds: string[], refundCoins: number = 0) => {
-    // Filter out items already owned
-    const newItems = itemIds.filter(id => !inventory.ownedItems.includes(id))
-    
-    if (newItems.length > 0) {
-      setInventory(prev => ({
+    // Use functional update to properly append to current state
+    setInventory(prev => {
+      // Filter out items already owned using prev state (avoids stale closure)
+      const newItems = itemIds.filter(id => !prev.ownedItems.includes(id))
+      
+      if (newItems.length === 0) {
+        return prev // No changes needed
+      }
+      
+      return {
         ...prev,
         ownedItems: [...prev.ownedItems, ...newItems],
-      }))
-    }
+      }
+    })
     
     // Add refund coins for duplicates
     if (refundCoins > 0) {
       setCurrency(prev => ({ ...prev, doryaCoins: prev.doryaCoins + refundCoins }))
     }
-  }, [inventory.ownedItems])
+  }, [])
 
   // Selection functions
   const selectStage = useCallback(async (id: string) => {
@@ -300,6 +315,26 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     setInventory(prev => ({ ...prev, selectedDummy: id }))
     await debouncedSync({ setSelection: { type: 'dummy', itemId: id } })
   }, [ownsItem, debouncedSync])
+
+  // Keybinding functions
+  const updateKeybinding = useCallback(async (key: keyof KeyBindings, value: string) => {
+    setInventory(prev => ({
+      ...prev,
+      keybindings: { ...prev.keybindings, [key]: value }
+    }))
+    
+    // Get updated keybindings for sync
+    const newKeybindings = { ...inventory.keybindings, [key]: value }
+    await debouncedSync({ keybindings: newKeybindings })
+  }, [inventory.keybindings, debouncedSync])
+
+  const resetKeybindings = useCallback(async () => {
+    setInventory(prev => ({
+      ...prev,
+      keybindings: { ...DEFAULT_KEYBINDINGS }
+    }))
+    await debouncedSync({ keybindings: { ...DEFAULT_KEYBINDINGS } })
+  }, [debouncedSync])
 
   // Get active customization
   const activeCustomization: ActiveCustomization = {
@@ -432,6 +467,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
       selectedElectricColor: data.inventory.selectedElectricColor,
       selectedCharacter: data.inventory.selectedCharacter,
       selectedDummy: data.inventory.selectedDummy,
+      keybindings: data.inventory.keybindings || { ...DEFAULT_KEYBINDINGS },
     })
   }, [])
 
@@ -463,6 +499,9 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         selectElectricColor,
         selectCharacter,
         selectDummy,
+        keybindings: inventory.keybindings,
+        updateKeybinding,
+        resetKeybindings,
         activeCustomization,
         openCrate,
         openCrateWithPremium,

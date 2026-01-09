@@ -66,7 +66,7 @@ export default function Game({ mode, onBack }: GameProps) {
     }
   }, [])
   
-  const { activeCustomization, addCoins } = useCustomization()
+  const { activeCustomization, addCoins, keybindings } = useCustomization()
   
   const {
     state,
@@ -106,7 +106,7 @@ export default function Game({ mode, onBack }: GameProps) {
     inputHistory,
     handleTouchInput,
     controllerConnected,
-  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash)
+  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash, keybindings)
 
   const handleStart = () => {
     setShowResult(false)

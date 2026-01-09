@@ -9,6 +9,7 @@ const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
 // Default items for new players
 const DEFAULT_OWNED_ITEMS = ['stage_classic', 'electric_blue', 'electric_gold', 'char_mishima', 'dummy_classic']
 const DEFAULT_DORYA_COINS = 500
+const DEFAULT_KEYBINDINGS = { forward: 'KeyD', down: 'KeyS', punch: 'KeyK' }
 
 function generateGuestUsername(): string {
   const randomNum = Math.floor(Math.random() * 9000000000) + 1000000000
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       
       if (player) {
         const ownedItems = player.inventory?.ownedItems as string[] ?? DEFAULT_OWNED_ITEMS
+        const keybindings = (player.inventory?.keybindings as { forward: string; down: string; punch: string }) ?? DEFAULT_KEYBINDINGS
         
         return NextResponse.json({
           success: true,
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
               selectedElectricColor: player.inventory?.selectedElectricColor ?? 'electric_blue',
               selectedCharacter: player.inventory?.selectedCharacter ?? 'char_mishima',
               selectedDummy: player.inventory?.selectedDummy ?? 'dummy_classic',
+              keybindings,
             },
           },
         })
@@ -73,6 +76,7 @@ export async function GET(request: NextRequest) {
       
       if (player) {
         const ownedItems = player.inventory?.ownedItems as string[] ?? DEFAULT_OWNED_ITEMS
+        const keybindings = (player.inventory?.keybindings as { forward: string; down: string; punch: string }) ?? DEFAULT_KEYBINDINGS
         
         return NextResponse.json({
           success: true,
@@ -93,6 +97,7 @@ export async function GET(request: NextRequest) {
               selectedElectricColor: player.inventory?.selectedElectricColor ?? 'electric_blue',
               selectedCharacter: player.inventory?.selectedCharacter ?? 'char_mishima',
               selectedDummy: player.inventory?.selectedDummy ?? 'dummy_classic',
+              keybindings,
             },
           },
         })
@@ -142,6 +147,7 @@ export async function GET(request: NextRequest) {
           selectedElectricColor: 'electric_blue',
           selectedCharacter: 'char_mishima',
           selectedDummy: 'dummy_classic',
+          keybindings: DEFAULT_KEYBINDINGS,
         },
       },
     })

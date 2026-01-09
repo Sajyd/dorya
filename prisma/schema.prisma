@@ -62,6 +62,9 @@ model PlayerInventory {
   selectedCharacter     String    @default("char_mishima")
   selectedDummy         String    @default("dummy_classic")
   
+  // Key bindings (stored as JSON: { forward: string, down: string, punch: string })
+  keybindings           Json      @default("{\"forward\":\"KeyD\",\"down\":\"KeyS\",\"punch\":\"KeyK\"}")
+  
   updatedAt             DateTime  @updatedAt
 }
 

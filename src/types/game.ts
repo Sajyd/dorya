@@ -100,6 +100,20 @@ export interface PlayerCurrency {
   premiumCoins: number // Purchased with real money
 }
 
+// Key bindings for game controls
+export interface KeyBindings {
+  forward: string  // Key code for forward (default: 'KeyD')
+  down: string     // Key code for down (default: 'KeyS')
+  punch: string    // Key code for punch/2 button (default: 'KeyK')
+}
+
+// Default key bindings
+export const DEFAULT_KEYBINDINGS: KeyBindings = {
+  forward: 'KeyD',
+  down: 'KeyS',
+  punch: 'KeyK',
+}
+
 // Player's inventory
 export interface PlayerInventory {
   ownedItems: string[] // Array of item IDs
@@ -107,6 +121,7 @@ export interface PlayerInventory {
   selectedElectricColor: string
   selectedCharacter: string
   selectedDummy: string
+  keybindings: KeyBindings
 }
 
 // Active customization state for gameplay

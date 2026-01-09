@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       addPremiumCoins,
       addOwnedItems,
       setSelection,
+      keybindings,
     } = body
     
     // Build update data for player
@@ -142,6 +143,29 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Handle keybindings update
+    if (keybindings) {
+      // Validate keybindings object
+      const validKeys = ['forward', 'down', 'punch']
+      const sanitizedKeybindings: Record<string, string> = {}
+      
+      for (const key of validKeys) {
+        if (typeof keybindings[key] === 'string' && keybindings[key].length > 0) {
+          sanitizedKeybindings[key] = keybindings[key]
+        }
+      }
+      
+      if (Object.keys(sanitizedKeybindings).length > 0) {
+        // Merge with existing keybindings
+        const existingKeybindings = (player.inventory?.keybindings as Record<string, string>) ?? {
+          forward: 'KeyD',
+          down: 'KeyS',
+          punch: 'KeyK',
+        }
+        inventoryUpdate.keybindings = { ...existingKeybindings, ...sanitizedKeybindings }
+      }
+    }
+    
     // Update inventory if needed
     let updatedInventory = player.inventory
     if (Object.keys(inventoryUpdate).length > 0) {
@@ -166,6 +190,11 @@ export async function POST(request: NextRequest) {
     }
     
     const ownedItems = (updatedInventory?.ownedItems as string[]) ?? ['stage_classic', 'electric_blue', 'electric_gold', 'char_mishima', 'dummy_classic']
+    const playerKeybindings = (updatedInventory?.keybindings as { forward: string; down: string; punch: string }) ?? {
+      forward: 'KeyD',
+      down: 'KeyS',
+      punch: 'KeyK',
+    }
     
     return NextResponse.json({
       success: true,
@@ -180,6 +209,7 @@ export async function POST(request: NextRequest) {
           selectedElectricColor: updatedInventory?.selectedElectricColor ?? 'electric_blue',
           selectedCharacter: updatedInventory?.selectedCharacter ?? 'char_mishima',
           selectedDummy: updatedInventory?.selectedDummy ?? 'dummy_classic',
+          keybindings: playerKeybindings,
         },
       },
     })
