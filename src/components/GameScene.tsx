@@ -8,6 +8,38 @@ import * as THREE from 'three'
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
 import { DoryaAttempt, ActiveCustomization, StageItem, ElectricColorItem, CharacterItem, DummyItem } from '@/types/game'
 import { STAGES, ELECTRIC_COLORS, CHARACTERS, DUMMIES } from '@/lib/customizationData'
+import { useAudio, GraphicsQuality } from '@/context/AudioContext'
+
+// Graphics quality presets
+const QUALITY_SETTINGS: Record<GraphicsQuality, {
+  dpr: number
+  bloomIntensity: number
+  bloomLuminanceThreshold: number
+  shadowMapSize: number
+  enableBloom: boolean
+}> = {
+  low: {
+    dpr: 0.5,
+    bloomIntensity: 0,
+    bloomLuminanceThreshold: 1,
+    shadowMapSize: 512,
+    enableBloom: false,
+  },
+  medium: {
+    dpr: 0.75,
+    bloomIntensity: 0.3,
+    bloomLuminanceThreshold: 0.8,
+    shadowMapSize: 1024,
+    enableBloom: true,
+  },
+  high: {
+    dpr: 1,
+    bloomIntensity: 0.6,
+    bloomLuminanceThreshold: 0.7,
+    shadowMapSize: 2048,
+    enableBloom: true,
+  },
+}
 
 interface GameSceneProps {
   isPlaying: boolean
@@ -717,7 +749,7 @@ function ModelLoadingFallback({ position }: { position: [number, number, number]
 }
 
 // Main scene component
-function Scene({ isPlaying, lastAttempt, currentStreak, customization }: GameSceneProps) {
+function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySettings }: GameSceneProps & { qualitySettings?: typeof QUALITY_SETTINGS['high'] }) {
   const [isAttacking, setIsAttacking] = useState(false)
   const [isHit, setIsHit] = useState(false)
   const [showImpact, setShowImpact] = useState(false)
@@ -786,7 +818,7 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization }: GameSce
         position={[5, 10, 5]} 
         intensity={1.2} 
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[qualitySettings?.shadowMapSize || 2048, qualitySettings?.shadowMapSize || 2048]}
       />
       <pointLight position={[-4, 4, 3]} intensity={0.6} color={accentColor} />
       <pointLight position={[4, 4, 3]} intensity={0.6} color="#9d4edd" />
@@ -869,22 +901,41 @@ function FPSLimiter() {
 }
 
 export default function GameScene(props: GameSceneProps) {
-  const bloomIntensity = props.customization?.electricColor?.id === 'electric_rainbow' ? 0.8 : 0.6
+  const { settings } = useAudio()
+  const qualitySettings = QUALITY_SETTINGS[settings.graphicsQuality]
+  
+  // Rainbow effect gets slightly boosted bloom if enabled
+  const bloomIntensity = qualitySettings.enableBloom 
+    ? (props.customization?.electricColor?.id === 'electric_rainbow' 
+        ? qualitySettings.bloomIntensity * 1.33 
+        : qualitySettings.bloomIntensity)
+    : 0
   
   return (
-    <Canvas shadows className="!absolute !inset-0" frameloop="demand">
+    <Canvas 
+      shadows={settings.graphicsQuality !== 'low'} 
+      className="!absolute !inset-0" 
+      frameloop="demand"
+      dpr={qualitySettings.dpr}
+      gl={{ 
+        antialias: settings.graphicsQuality !== 'low',
+        powerPreference: settings.graphicsQuality === 'low' ? 'low-power' : 'high-performance',
+      }}
+    >
       <FPSLimiter />
       <Suspense fallback={null}>
-        <Scene {...props} />
+        <Scene {...props} qualitySettings={qualitySettings} />
         
-        {/* Post-processing effects */}
-        <EffectComposer>
-          <Bloom 
-            intensity={bloomIntensity}
-            luminanceThreshold={0.7}
-            luminanceSmoothing={0.9}
-          />
-        </EffectComposer>
+        {/* Post-processing effects - disabled on low quality */}
+        {qualitySettings.enableBloom && (
+          <EffectComposer>
+            <Bloom 
+              intensity={bloomIntensity}
+              luminanceThreshold={qualitySettings.bloomLuminanceThreshold}
+              luminanceSmoothing={0.9}
+            />
+          </EffectComposer>
+        )}
       </Suspense>
     </Canvas>
   )

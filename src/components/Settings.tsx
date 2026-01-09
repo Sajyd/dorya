@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/context/UserContext'
 import { useCustomization } from '@/lib/customizationContext'
+import { useAudio, GraphicsQuality } from '@/context/AudioContext'
 
 interface SettingsProps {
   onBack: () => void
@@ -11,9 +12,16 @@ interface SettingsProps {
 
 type SettingsTab = 'profile' | 'login' | 'signup'
 
+const QUALITY_LABELS: Record<GraphicsQuality, { label: string; description: string }> = {
+  low: { label: 'LOW', description: '50% resolution, no effects' },
+  medium: { label: 'MEDIUM', description: '75% resolution, reduced effects' },
+  high: { label: 'HIGH', description: 'Full resolution, all effects' },
+}
+
 export default function Settings({ onBack }: SettingsProps) {
   const { user, isLoggedIn, updateGuestUsername, login, signup, logout } = useUser()
   const { syncFromServer } = useCustomization()
+  const { settings: audioSettings, setGraphicsQuality } = useAudio()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   
   // Profile state
@@ -202,6 +210,39 @@ export default function Settings({ onBack }: SettingsProps) {
                 exit={{ opacity: 0, y: -20 }}
                 className="bg-black/50 border border-gray-800 rounded-lg p-8"
               >
+                {/* Graphics Quality Setting */}
+                <div className="mb-8">
+                  <h3 className="font-tekken text-sm text-tekken-gold tracking-wider mb-4">
+                    ⚡ GRAPHICS QUALITY
+                  </h3>
+                  <p className="text-gray-500 text-xs font-sans mb-4">
+                    Lower quality for better performance on slower devices
+                  </p>
+                  <div className="flex gap-2">
+                    {(['low', 'medium', 'high'] as GraphicsQuality[]).map((quality) => (
+                      <button
+                        key={quality}
+                        onClick={() => setGraphicsQuality(quality)}
+                        className={`
+                          flex-1 px-4 py-3 font-tekken text-sm tracking-wider rounded transition-all duration-300
+                          border-2
+                          ${audioSettings.graphicsQuality === quality
+                            ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
+                            : 'border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                          }
+                        `}
+                      >
+                        <div>{QUALITY_LABELS[quality].label}</div>
+                        <div className="text-[10px] mt-1 opacity-70 font-sans normal-case">
+                          {QUALITY_LABELS[quality].description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-800 mb-8" />
+
                 {/* User info */}
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-tekken-gold to-orange-600 mb-4">

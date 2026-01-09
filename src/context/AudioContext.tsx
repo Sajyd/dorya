@@ -2,12 +2,15 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+export type GraphicsQuality = 'low' | 'medium' | 'high'
+
 interface AudioSettings {
   musicEnabled: boolean
   sfxEnabled: boolean
   musicVolume: number
   sfxVolume: number
   showFps: boolean
+  graphicsQuality: GraphicsQuality
 }
 
 interface AudioContextType {
@@ -17,6 +20,7 @@ interface AudioContextType {
   setMusicVolume: (volume: number) => void
   setSfxVolume: (volume: number) => void
   setShowFps: (show: boolean) => void
+  setGraphicsQuality: (quality: GraphicsQuality) => void
 }
 
 const defaultSettings: AudioSettings = {
@@ -25,6 +29,7 @@ const defaultSettings: AudioSettings = {
   musicVolume: 0.5,
   sfxVolume: 0.7,
   showFps: false,
+  graphicsQuality: 'high',
 }
 
 const AudioContext = createContext<AudioContextType | null>(null)
@@ -83,6 +88,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setSettings(prev => ({ ...prev, showFps: show }))
   }
 
+  const setGraphicsQuality = (quality: GraphicsQuality) => {
+    setSettings(prev => ({ ...prev, graphicsQuality: quality }))
+  }
+
   return (
     <AudioContext.Provider
       value={{
@@ -92,6 +101,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setMusicVolume,
         setSfxVolume,
         setShowFps,
+        setGraphicsQuality,
       }}
     >
       {children}
