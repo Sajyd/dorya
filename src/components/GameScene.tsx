@@ -842,11 +842,38 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization }: GameSce
   )
 }
 
+// FPS limiter component - caps rendering at 60fps
+function FPSLimiter() {
+  const { invalidate } = useThree()
+  const lastFrameTime = useRef(0)
+  const frameInterval = 1000 / 60 // 60fps = ~16.67ms per frame
+
+  useEffect(() => {
+    let animationId: number
+
+    const loop = (time: number) => {
+      animationId = requestAnimationFrame(loop)
+      
+      const delta = time - lastFrameTime.current
+      if (delta >= frameInterval) {
+        lastFrameTime.current = time - (delta % frameInterval)
+        invalidate()
+      }
+    }
+
+    animationId = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(animationId)
+  }, [invalidate, frameInterval])
+
+  return null
+}
+
 export default function GameScene(props: GameSceneProps) {
   const bloomIntensity = props.customization?.electricColor?.id === 'electric_rainbow' ? 0.8 : 0.6
   
   return (
-    <Canvas shadows className="!absolute !inset-0">
+    <Canvas shadows className="!absolute !inset-0" frameloop="demand">
+      <FPSLimiter />
       <Suspense fallback={null}>
         <Scene {...props} />
         
