@@ -153,6 +153,16 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
               {state.currentStreak === 1 ? 'DORYA!' : 'DORYA COMBO!'}
             </motion.div>
           )}
+          {/* Max streak display for DORYA_STREAK mode */}
+          {mode === 'DORYA_STREAK' && state.maxStreak > 0 && (
+            <motion.div 
+              className="mt-2 font-tekken text-sm tracking-wider text-tekken-gold/80"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              BEST: {state.maxStreak}
+            </motion.div>
+          )}
         </div>
 
         {/* Right side - Stats and controls */}

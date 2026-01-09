@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
 import { CrateType, ShopItem, ItemRarity } from '@/types/game'
 import { LOOT_CRATES, RARITY_COLORS, RARITY_GLOW } from '@/lib/customizationData'
 
@@ -23,6 +24,7 @@ interface LootCrateOpeningProps {
     floorColor?: string
     gridColor?: string
     accentColor?: string
+    preview?: string
   }>
   onClaim?: () => void
 }
@@ -571,6 +573,7 @@ function ItemPreview({ item }: { item: {
   floorColor?: string
   gridColor?: string
   accentColor?: string
+  preview?: string
 }}) {
   switch (item.category) {
     case 'stage':
@@ -609,6 +612,29 @@ function ItemPreview({ item }: { item: {
     
     case 'character':
     case 'dummy':
+      // Use preview image if available
+      if (item.preview) {
+        return (
+          <div className="relative w-full h-full">
+            <Image
+              src={item.preview}
+              alt="Item preview"
+              fill
+              className="object-contain"
+              sizes="(max-width: 768px) 80px, 120px"
+            />
+            {item.glowColor && (
+              <motion.div
+                className="absolute inset-0 pointer-events-none"
+                style={{ boxShadow: `inset 0 0 20px ${item.glowColor}` }}
+                animate={{ opacity: [0.3, 0.7, 0.3] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+          </div>
+        )
+      }
+      // Fallback to silhouette
       return (
         <div className="relative">
           <div

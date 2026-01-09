@@ -48,6 +48,7 @@ interface CustomizationContextType {
   ownsItem: (itemId: string) => boolean
   purchaseItem: (item: ShopItem) => Promise<boolean>
   purchaseItemWithPremium: (item: ShopItem) => Promise<boolean>
+  addItemsToInventory: (itemIds: string[], refundCoins?: number) => void
   
   // Selection
   selectStage: (id: string) => Promise<void>
@@ -257,6 +258,24 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     return true
   }, [ownsItem, currency.premiumCoins, inventory.ownedItems])
 
+  // Add items to inventory (used after opening Stripe crates - server already updated)
+  const addItemsToInventory = useCallback((itemIds: string[], refundCoins: number = 0) => {
+    // Filter out items already owned
+    const newItems = itemIds.filter(id => !inventory.ownedItems.includes(id))
+    
+    if (newItems.length > 0) {
+      setInventory(prev => ({
+        ...prev,
+        ownedItems: [...prev.ownedItems, ...newItems],
+      }))
+    }
+    
+    // Add refund coins for duplicates
+    if (refundCoins > 0) {
+      setCurrency(prev => ({ ...prev, doryaCoins: prev.doryaCoins + refundCoins }))
+    }
+  }, [inventory.ownedItems])
+
   // Selection functions
   const selectStage = useCallback(async (id: string) => {
     if (!ownsItem(id)) return
@@ -439,6 +458,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         ownsItem,
         purchaseItem,
         purchaseItemWithPremium,
+        addItemsToInventory,
         selectStage,
         selectElectricColor,
         selectCharacter,

@@ -103,7 +103,9 @@ function GameApp() {
   const [pendingCrate, setPendingCrate] = useState<PendingCrate | null>(null)
   const [openingCrate, setOpeningCrate] = useState<PendingCrate | null>(null)
   const [crateItems, setCrateItems] = useState<CrateItem[] | null>(null)
+  const [pendingInventoryUpdate, setPendingInventoryUpdate] = useState<{ itemIds: string[]; refundCoins: number } | null>(null)
   const { user } = useUser()
+  const { addItemsToInventory } = useCustomization()
 
   const handlePlay = (mode: GameMode) => {
     setGameMode(mode)
@@ -138,6 +140,9 @@ function GameApp() {
         setCrateItems(data.items)
         setOpeningCrate(pendingCrate)
         setPendingCrate(null)
+        // Store items to add to inventory when claimed
+        const newItemIds = data.items.filter((item: CrateItem) => item.isNew).map((item: CrateItem) => item.id)
+        setPendingInventoryUpdate({ itemIds: newItemIds, refundCoins: data.refundCoins || 0 })
       } else {
         console.error('Failed to open crate:', data.error)
         // Still close the modal on error
@@ -155,6 +160,11 @@ function GameApp() {
   }
 
   const handleClaimRewards = () => {
+    // Update local inventory with the items from the crate
+    if (pendingInventoryUpdate) {
+      addItemsToInventory(pendingInventoryUpdate.itemIds, pendingInventoryUpdate.refundCoins)
+      setPendingInventoryUpdate(null)
+    }
     setOpeningCrate(null)
     setCrateItems(null)
   }
@@ -179,6 +189,9 @@ function GameApp() {
         setCrateItems(data.items)
         setOpeningCrate(crate)
         setScreen('menu')
+        // Store items to add to inventory when claimed
+        const newItemIds = data.items.filter((item: CrateItem) => item.isNew).map((item: CrateItem) => item.id)
+        setPendingInventoryUpdate({ itemIds: newItemIds, refundCoins: data.refundCoins || 0 })
       } else {
         console.error('Failed to open crate from locker:', data.error)
       }
