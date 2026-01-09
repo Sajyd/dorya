@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { motion } from 'framer-motion'
 
 interface MobileControlsProps {
   isPlaying: boolean
@@ -158,54 +157,52 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
             {/* Direction buttons side by side: Down on left, Forward on right */}
             <div className="flex items-center gap-2">
               {/* Down button */}
-              <motion.button
+              <button
                 data-mobile-key="KeyS"
                 className={`
                   w-20 h-20 rounded-2xl
                   flex flex-col items-center justify-center
                   font-tekken text-lg tracking-wider
                   select-none touch-none
-                  transition-all duration-75
-                  ${isKeyActive('KeyS')
-                    ? 'bg-electric-blue/40 border-electric-blue text-electric-blue shadow-[0_0_25px_rgba(0,212,255,0.6)] scale-95' 
-                    : 'bg-black/60 border-gray-600 text-gray-400 backdrop-blur-sm'
-                  }
+                  bg-black/60 backdrop-blur-sm
                   border-2
+                  ${isKeyActive('KeyS')
+                    ? 'border-electric-blue text-electric-blue' 
+                    : 'border-gray-600 text-gray-400'
+                  }
                 `}
                 onMouseDown={handleMouseDown('KeyS')}
                 onMouseUp={handleMouseUp('KeyS')}
                 onMouseLeave={handleMouseUp('KeyS')}
-                whileTap={{ scale: 0.9 }}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 <span className="text-2xl font-bold">↓</span>
                 <span className="text-xs text-gray-500 mt-0.5">DOWN</span>
-              </motion.button>
+              </button>
               
               {/* Forward button */}
-              <motion.button
+              <button
                 data-mobile-key="KeyD"
                 className={`
                   w-20 h-20 rounded-2xl
                   flex flex-col items-center justify-center
                   font-tekken text-lg tracking-wider
                   select-none touch-none
-                  transition-all duration-75
-                  ${isKeyActive('KeyD')
-                    ? 'bg-electric-blue/40 border-electric-blue text-electric-blue shadow-[0_0_25px_rgba(0,212,255,0.6)] scale-95' 
-                    : 'bg-black/60 border-gray-600 text-gray-400 backdrop-blur-sm'
-                  }
+                  bg-black/60 backdrop-blur-sm
                   border-2
+                  ${isKeyActive('KeyD')
+                    ? 'border-electric-blue text-electric-blue' 
+                    : 'border-gray-600 text-gray-400'
+                  }
                 `}
                 onMouseDown={handleMouseDown('KeyD')}
                 onMouseUp={handleMouseUp('KeyD')}
                 onMouseLeave={handleMouseUp('KeyD')}
-                whileTap={{ scale: 0.9 }}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 <span className="text-2xl font-bold">→</span>
                 <span className="text-xs text-gray-500 mt-0.5">FWD</span>
-              </motion.button>
+              </button>
             </div>
             
             {/* Visual hint for df combo */}
@@ -219,30 +216,28 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
 
         {/* Right side - Punch button */}
         <div className="pointer-events-auto">
-          <motion.button
+          <button
             data-mobile-key="KeyK"
             className={`
               w-28 h-28 rounded-full
               flex flex-col items-center justify-center
               font-tekken text-2xl tracking-wider
               select-none touch-none
-              transition-all duration-75
-              border-3
-              ${isKeyActive('KeyK')
-                ? 'bg-tekken-gold/40 border-tekken-gold text-tekken-gold shadow-[0_0_40px_rgba(255,215,0,0.7)] scale-95' 
-                : 'bg-black/60 border-tekken-gold/50 text-tekken-gold/70 backdrop-blur-sm'
-              }
+              bg-black/60 backdrop-blur-sm
               border-[3px]
+              ${isKeyActive('KeyK')
+                ? 'border-tekken-gold text-tekken-gold' 
+                : 'border-tekken-gold/50 text-tekken-gold/70'
+              }
             `}
             onMouseDown={handleMouseDown('KeyK')}
             onMouseUp={handleMouseUp('KeyK')}
             onMouseLeave={handleMouseUp('KeyK')}
-            whileTap={{ scale: 0.85 }}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span className="text-4xl font-black">2</span>
             <span className="text-xs opacity-70">PUNCH</span>
-          </motion.button>
+          </button>
         </div>
       </div>
     </div>
