@@ -218,37 +218,25 @@ export function useGameInput(
       // Calculate timing: frames between d and df+2
       frameDiff = dfPunchInput.frame - downInput!.frame
       
-      if (!hasNeutralBetween) {
-        // No neutral after forward: f → d → df+2
-        // This is only valid as PEWGF (0-1 frame gap between d and df+2)
-        if (frameDiff <= 1) {
-          // PEWGF: d~df+2 same frame or 1 frame gap
-          result = 'perfect'
-        } else {
-          // Without neutral, anything slower than 1 frame is a MISS
-          return null
-        }
+      // EWGF can only be performed during wavedash state (~20 frame window)
+      const WAVEDASH_WINDOW_FRAMES = 20
+      
+      if (frameDiff > WAVEDASH_WINDOW_FRAMES) {
+        // Outside wavedash window - no longer in wavedash state, not a valid EWGF
+        return null
+      } else if (frameDiff <= 1) {
+        // PEWGF: d and df+2 on same frame or 1-frame gap
+        // f(1f) → d(1f) → df+2(1f) = perfect timing
+        result = 'perfect'
+      } else if (frameDiff <= 3) {
+        // Good EWGF - 2-3 frame gap
+        result = 'good'
       } else {
-        // Has neutral: f → n → d → df+2 (standard EWGF motion)
-        // EWGF can only be performed during wavedash state (~20 frame window)
-        const WAVEDASH_WINDOW_FRAMES = 20
-        
-        if (frameDiff > WAVEDASH_WINDOW_FRAMES) {
-          // Outside wavedash window - no longer in wavedash state, not a valid EWGF
-          return null
-        } else if (frameDiff === 0) {
-          // True PEWGF: d and df+2 on same frame - 13 frame startup
-          result = 'perfect'
-        } else if (frameDiff <= 2) {
-          // Good EWGF - 1-2 frame gap - 14 frame startup
-          result = 'good'
-        } else {
-          // Slow EWGF - 3-20 frame gap - valid motion but slow timing
-          result = 'bad'
-        }
+        // Slow EWGF - 4-20 frame gap - valid motion but slow timing
+        result = 'bad'
       }
     } else {
-      // Invalid motion: no neutral or pure down between f and df+2
+      // Invalid motion: no neutral or down between f and df+2
       // This happens when player holds forward and adds down, which is incorrect
       return null
     }
