@@ -7,6 +7,7 @@ interface AudioSettings {
   sfxEnabled: boolean
   musicVolume: number
   sfxVolume: number
+  showFps: boolean
 }
 
 interface AudioContextType {
@@ -15,6 +16,7 @@ interface AudioContextType {
   setSfxEnabled: (enabled: boolean) => void
   setMusicVolume: (volume: number) => void
   setSfxVolume: (volume: number) => void
+  setShowFps: (show: boolean) => void
 }
 
 const defaultSettings: AudioSettings = {
@@ -22,6 +24,7 @@ const defaultSettings: AudioSettings = {
   sfxEnabled: true,
   musicVolume: 0.5,
   sfxVolume: 0.7,
+  showFps: false,
 }
 
 const AudioContext = createContext<AudioContextType | null>(null)
@@ -76,6 +79,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setSettings(prev => ({ ...prev, sfxVolume: Math.max(0, Math.min(1, volume)) }))
   }
 
+  const setShowFps = (show: boolean) => {
+    setSettings(prev => ({ ...prev, showFps: show }))
+  }
+
   return (
     <AudioContext.Provider
       value={{
@@ -84,6 +91,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setSfxEnabled,
         setMusicVolume,
         setSfxVolume,
+        setShowFps,
       }}
     >
       {children}

@@ -17,6 +17,13 @@ const BUTTON_KEYS: Record<string, InputButton> = {
 // Valid keys that the game accepts
 const VALID_KEYS = new Set(['KeyD', 'KeyS', 'KeyK'])
 
+// Gamepad button mappings (standard gamepad layout)
+// https://w3c.github.io/gamepad/#remapping
+const GAMEPAD_PUNCH_BUTTONS = [0, 1, 2, 3] // A/B/X/Y or Cross/Circle/Square/Triangle
+const GAMEPAD_DPAD_DOWN = 13
+const GAMEPAD_DPAD_RIGHT = 15
+const GAMEPAD_STICK_THRESHOLD = 0.5 // Threshold for analog stick activation
+
 // Frame timing (60fps = ~16.67ms per frame)
 const FRAME_MS = 1000 / 60
 
@@ -28,6 +35,7 @@ interface UseGameInputReturn {
   resetInputs: () => void
   inputHistory: CommandInput[]
   handleTouchInput: (touchKeys: Set<string>) => void
+  controllerConnected: boolean
 }
 
 export function useGameInput(
@@ -188,8 +196,14 @@ export function useGameInput(
     // INVALID: If there's any df (without punch) in the sequence after forward
     // This means df and df+2 were on different frames (otherwise df would be replaced by df+2)
     // Catches: f, n, df, df+2 | f, df, df+2 | f, n, d, df, df+2 | etc.
+    // HOWEVER: Allow if df and df+2 are within 1 frame (same input motion split across frame boundary)
+    // This handles cases where player transitions from d to df+2 but keyboard events fire separately
     if (dfNoPunchInput && dfNoPunchInput.timestamp > forwardInput.timestamp) {
-      return null
+      const frameDiffDfToDfPunch = dfPunchInput.frame - dfNoPunchInput.frame
+      // Only invalidate if df was held for more than 1 frame before pressing punch
+      if (frameDiffDfToDfPunch > 1) {
+        return null
+      }
     }
     
     // INVALID: Check for extra forwards after neutral
@@ -240,18 +254,21 @@ export function useGameInput(
         }
       } else {
         // Has neutral: f → n → d → df+2 (standard EWGF motion)
-        if (frameDiff === 0) {
+        // EWGF can only be performed during wavedash state (~20 frame window)
+        const WAVEDASH_WINDOW_FRAMES = 20
+        
+        if (frameDiff > WAVEDASH_WINDOW_FRAMES) {
+          // Outside wavedash window - no longer in wavedash state, not a valid EWGF
+          return null
+        } else if (frameDiff === 0) {
           // True PEWGF: d and df+2 on same frame - 13 frame startup
           result = 'perfect'
         } else if (frameDiff <= 2) {
           // Good EWGF - 1-2 frame gap - 14 frame startup
           result = 'good'
-        } else if (frameDiff <= 5) {
-          // Regular EWGF - 3-5 frame gap - still acceptable but not great
-          result = 'bad'
         } else {
-          // Too slow - WGF not electric
-          return null
+          // Slow EWGF - 3-20 frame gap - valid motion but slow timing
+          result = 'bad'
         }
       }
     } else {
@@ -393,10 +410,16 @@ export function useGameInput(
     lastInputTimeRef.current = now
   }, [getCurrentFrame, checkDoryaInput, checkWavedashMotion, checkWGFMotion, onDoryaAttempt, onWavedash, resetInputs])
 
-  // Shared key processing logic for both keyboard and touch
+  // Shared key processing logic for keyboard, touch, and gamepad
   const keyboardKeysRef = useRef<Set<string>>(new Set())
   const touchKeysRef = useRef<Set<string>>(new Set())
+  const gamepadKeysRef = useRef<Set<string>>(new Set())
   const lastProcessedDirectionRef = useRef<InputDirection | null>(null)
+  
+  // Gamepad state
+  const [controllerConnected, setControllerConnected] = useState(false)
+  const gamepadIndexRef = useRef<number | null>(null)
+  const lastPunchPressedRef = useRef(false)
 
   const processKeyState = useCallback((allKeys: Set<string>, changedKey?: string) => {
     // Check for directions
@@ -428,6 +451,15 @@ export function useGameInput(
     }
   }, [processInput])
 
+  // Combine all input sources (keyboard, touch, gamepad)
+  const combineAllKeys = useCallback(() => {
+    return new Set([
+      ...Array.from(keyboardKeysRef.current),
+      ...Array.from(touchKeysRef.current),
+      ...Array.from(gamepadKeysRef.current)
+    ])
+  }, [])
+
   // Handle touch input from mobile controls
   const handleTouchInput = useCallback((touchKeys: Set<string>) => {
     if (!isPlaying) return
@@ -435,8 +467,8 @@ export function useGameInput(
     const prevTouchKeys = new Set(touchKeysRef.current)
     touchKeysRef.current = touchKeys
     
-    // Combine keyboard and touch keys
-    const allKeys = new Set([...Array.from(keyboardKeysRef.current), ...Array.from(touchKeys)])
+    // Combine all input sources
+    const allKeys = combineAllKeys()
     setActiveKeys(allKeys)
     
     // Find which key changed (for punch detection)
@@ -451,7 +483,133 @@ export function useGameInput(
     }
     
     processKeyState(allKeys, changedKey)
-  }, [isPlaying, processKeyState])
+  }, [isPlaying, processKeyState, combineAllKeys])
+  
+  // Handle gamepad input
+  const handleGamepadInput = useCallback((newGamepadKeys: Set<string>, punchJustPressed: boolean) => {
+    if (!isPlaying) return
+    
+    gamepadKeysRef.current = newGamepadKeys
+    
+    // Combine all input sources
+    const allKeys = combineAllKeys()
+    setActiveKeys(allKeys)
+    
+    // Only trigger punch processing when punch button is newly pressed
+    const changedKey = punchJustPressed ? 'KeyK' : undefined
+    
+    processKeyState(allKeys, changedKey)
+  }, [isPlaying, processKeyState, combineAllKeys])
+
+  // Gamepad connection handlers
+  useEffect(() => {
+    const handleGamepadConnected = (e: GamepadEvent) => {
+      console.log('Gamepad connected:', e.gamepad.id)
+      gamepadIndexRef.current = e.gamepad.index
+      setControllerConnected(true)
+    }
+    
+    const handleGamepadDisconnected = (e: GamepadEvent) => {
+      console.log('Gamepad disconnected:', e.gamepad.id)
+      if (gamepadIndexRef.current === e.gamepad.index) {
+        gamepadIndexRef.current = null
+        setControllerConnected(false)
+        gamepadKeysRef.current.clear()
+      }
+    }
+    
+    // Check for already connected gamepads
+    const gamepads = navigator.getGamepads()
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i]) {
+        gamepadIndexRef.current = i
+        setControllerConnected(true)
+        break
+      }
+    }
+    
+    window.addEventListener('gamepadconnected', handleGamepadConnected)
+    window.addEventListener('gamepaddisconnected', handleGamepadDisconnected)
+    
+    return () => {
+      window.removeEventListener('gamepadconnected', handleGamepadConnected)
+      window.removeEventListener('gamepaddisconnected', handleGamepadDisconnected)
+    }
+  }, [])
+  
+  // Gamepad polling loop
+  useEffect(() => {
+    if (!isPlaying) return
+    
+    let animationFrameId: number
+    
+    const pollGamepad = () => {
+      if (gamepadIndexRef.current === null) {
+        animationFrameId = requestAnimationFrame(pollGamepad)
+        return
+      }
+      
+      const gamepads = navigator.getGamepads()
+      const gamepad = gamepads[gamepadIndexRef.current]
+      
+      if (!gamepad) {
+        animationFrameId = requestAnimationFrame(pollGamepad)
+        return
+      }
+      
+      const newKeys = new Set<string>()
+      
+      // Check D-pad for directions
+      if (gamepad.buttons[GAMEPAD_DPAD_DOWN]?.pressed) {
+        newKeys.add('KeyS') // Down
+      }
+      if (gamepad.buttons[GAMEPAD_DPAD_RIGHT]?.pressed) {
+        newKeys.add('KeyD') // Forward
+      }
+      
+      // Check left analog stick for directions
+      // Stick X: negative = left, positive = right
+      // Stick Y: negative = up, positive = down
+      if (gamepad.axes[0] > GAMEPAD_STICK_THRESHOLD) {
+        newKeys.add('KeyD') // Forward (right)
+      }
+      if (gamepad.axes[1] > GAMEPAD_STICK_THRESHOLD) {
+        newKeys.add('KeyS') // Down
+      }
+      
+      // Check punch buttons (face buttons)
+      let punchPressed = false
+      for (const buttonIndex of GAMEPAD_PUNCH_BUTTONS) {
+        if (gamepad.buttons[buttonIndex]?.pressed) {
+          punchPressed = true
+          newKeys.add('KeyK')
+          break
+        }
+      }
+      
+      // Check if punch was just pressed (for input registration)
+      const punchJustPressed = punchPressed && !lastPunchPressedRef.current
+      lastPunchPressedRef.current = punchPressed
+      
+      // Check if gamepad state changed
+      const prevKeys = gamepadKeysRef.current
+      const keysChanged = newKeys.size !== prevKeys.size ||
+        Array.from(newKeys).some(k => !prevKeys.has(k)) ||
+        Array.from(prevKeys).some(k => !newKeys.has(k))
+      
+      if (keysChanged || punchJustPressed) {
+        handleGamepadInput(newKeys, punchJustPressed)
+      }
+      
+      animationFrameId = requestAnimationFrame(pollGamepad)
+    }
+    
+    animationFrameId = requestAnimationFrame(pollGamepad)
+    
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+    }
+  }, [isPlaying, handleGamepadInput])
 
   // Keyboard event handlers (disabled on mobile/touch devices)
   useEffect(() => {
@@ -478,8 +636,8 @@ export function useGameInput(
       
       keyboardKeysRef.current.add(code)
       
-      // Combine keyboard and touch keys
-      const allKeys = new Set([...Array.from(keyboardKeysRef.current), ...Array.from(touchKeysRef.current)])
+      // Combine all input sources
+      const allKeys = combineAllKeys()
       setActiveKeys(allKeys)
       
       processKeyState(allKeys, code)
@@ -492,8 +650,8 @@ export function useGameInput(
       
       keyboardKeysRef.current.delete(code)
       
-      // Combine keyboard and touch keys
-      const allKeys = new Set([...Array.from(keyboardKeysRef.current), ...Array.from(touchKeysRef.current)])
+      // Combine all input sources
+      const allKeys = combineAllKeys()
       setActiveKeys(allKeys)
       
       processKeyState(allKeys)
@@ -506,7 +664,7 @@ export function useGameInput(
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [isPlaying, processKeyState])
+  }, [isPlaying, processKeyState, combineAllKeys])
 
   // Frame counter
   useEffect(() => {
@@ -527,6 +685,7 @@ export function useGameInput(
     resetInputs,
     inputHistory,
     handleTouchInput,
+    controllerConnected,
   }
 }
 

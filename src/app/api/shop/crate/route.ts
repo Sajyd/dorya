@@ -121,15 +121,50 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json({
-      success: true,
-      items: items.map(item => ({
+    // Build response items with proper type narrowing for visual properties
+    const responseItems = items.map(item => {
+      const baseItem = {
         id: item.id,
         name: item.name,
         category: item.category,
         rarity: item.rarity,
         isNew: !ownedItems.includes(item.id),
-      })),
+      }
+      
+      // Add category-specific visual properties
+      if (item.category === 'stage') {
+        return {
+          ...baseItem,
+          floorColor: item.floorColor,
+          gridColor: item.gridColor,
+          accentColor: item.accentColor,
+        }
+      } else if (item.category === 'electric_color') {
+        return {
+          ...baseItem,
+          primaryColor: item.primaryColor,
+          secondaryColor: item.secondaryColor,
+        }
+      } else if (item.category === 'character') {
+        return {
+          ...baseItem,
+          skinColor: item.skinColor,
+          clothColor: item.clothColor,
+          glowColor: item.glowColor,
+        }
+      } else if (item.category === 'dummy') {
+        return {
+          ...baseItem,
+          skinColor: item.skinColor,
+          clothColor: item.clothColor,
+        }
+      }
+      return baseItem
+    })
+
+    return NextResponse.json({
+      success: true,
+      items: responseItems,
       refundCoins,
     })
   } catch (error) {

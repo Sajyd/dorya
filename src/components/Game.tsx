@@ -105,6 +105,7 @@ export default function Game({ mode, onBack }: GameProps) {
     activeKeys,
     inputHistory,
     handleTouchInput,
+    controllerConnected,
   } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash)
 
   const handleStart = () => {
@@ -186,6 +187,7 @@ export default function Game({ mode, onBack }: GameProps) {
         activeKeys={activeKeys}
         onPause={pauseGame}
         onBack={handleQuit}
+        controllerConnected={controllerConnected}
       />
 
       {/* Command History - scaled down on mobile */}
@@ -258,10 +260,28 @@ export default function Game({ mode, onBack }: GameProps) {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
+                {/* Controller indicator */}
+                {controllerConnected && (
+                  <div className="hidden md:flex items-center justify-center gap-2 mb-3 text-green-400">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                    </svg>
+                    <span className="font-tekken text-xs tracking-wider">CONTROLLER CONNECTED</span>
+                  </div>
+                )}
                 {/* Desktop controls */}
                 <div className="hidden md:block">
-                  <p>Controls: D → Release → S → S+D+K</p>
-                  <p className="text-xs mt-1">(Forward, Neutral, Down, Down-Forward+Punch)</p>
+                  {controllerConnected ? (
+                    <>
+                      <p>Controls: → Release → ↓ → ↓→+A/B/X/Y</p>
+                      <p className="text-xs mt-1">(D-pad/Stick: Right, Neutral, Down, Down-Right + Face Button)</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>Controls: D → Release → S → S+D+K</p>
+                      <p className="text-xs mt-1">(Forward, Neutral, Down, Down-Forward+Punch)</p>
+                    </>
+                  )}
                 </div>
                 {/* Mobile controls hint */}
                 <div className="md:hidden">

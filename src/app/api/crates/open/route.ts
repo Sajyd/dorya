@@ -130,30 +130,50 @@ export async function POST(request: Request) {
       }),
     ])
 
-    return NextResponse.json({
-      success: true,
-      items: items.map(item => ({
+    // Build response items with proper type narrowing
+    const responseItems = items.map(item => {
+      const baseItem = {
         id: item.id,
         name: item.name,
         category: item.category,
         rarity: item.rarity,
         isNew: !ownedItems.includes(item.id),
-        // Include visual properties for display
-        ...(item.category === 'stage' && {
+      }
+      
+      // Add category-specific visual properties
+      if (item.category === 'stage') {
+        return {
+          ...baseItem,
           floorColor: item.floorColor,
           gridColor: item.gridColor,
           accentColor: item.accentColor,
-        }),
-        ...(item.category === 'electric_color' && {
+        }
+      } else if (item.category === 'electric_color') {
+        return {
+          ...baseItem,
           primaryColor: item.primaryColor,
           secondaryColor: item.secondaryColor,
-        }),
-        ...((item.category === 'character' || item.category === 'dummy') && {
+        }
+      } else if (item.category === 'character') {
+        return {
+          ...baseItem,
           skinColor: item.skinColor,
           clothColor: item.clothColor,
-          glowColor: 'glowColor' in item ? item.glowColor : undefined,
-        }),
-      })),
+          glowColor: item.glowColor,
+        }
+      } else if (item.category === 'dummy') {
+        return {
+          ...baseItem,
+          skinColor: item.skinColor,
+          clothColor: item.clothColor,
+        }
+      }
+      return baseItem
+    })
+
+    return NextResponse.json({
+      success: true,
+      items: responseItems,
       refundCoins,
     })
   } catch (error) {

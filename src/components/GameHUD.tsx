@@ -1,8 +1,10 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GameMode, GameState } from '@/types/game'
 import { useUser } from '@/context/UserContext'
+import { useAudio } from '@/context/AudioContext'
 
 interface GameHUDProps {
   mode: GameMode
@@ -10,6 +12,7 @@ interface GameHUDProps {
   activeKeys: Set<string>
   onPause: () => void
   onBack: () => void
+  controllerConnected?: boolean
 }
 
 const modeLabels: Record<GameMode, string> = {
@@ -19,8 +22,52 @@ const modeLabels: Record<GameMode, string> = {
   FREESTYLE: 'FREESTYLE',
 }
 
-export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: GameHUDProps) {
+export default function GameHUD({ mode, state, activeKeys, onPause, onBack, controllerConnected }: GameHUDProps) {
   const { user } = useUser()
+  const { settings, setShowFps } = useAudio()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [fps, setFps] = useState(0)
+  const frameTimesRef = useRef<number[]>([])
+  const lastFrameTimeRef = useRef(performance.now())
+  const animationFrameRef = useRef<number>()
+  
+  // FPS calculation
+  useEffect(() => {
+    if (!settings.showFps) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+      return
+    }
+    
+    const measureFps = () => {
+      const now = performance.now()
+      const delta = now - lastFrameTimeRef.current
+      lastFrameTimeRef.current = now
+      
+      frameTimesRef.current.push(delta)
+      // Keep last 60 frames for averaging
+      if (frameTimesRef.current.length > 60) {
+        frameTimesRef.current.shift()
+      }
+      
+      // Calculate average FPS every 10 frames
+      if (frameTimesRef.current.length % 10 === 0) {
+        const avgDelta = frameTimesRef.current.reduce((a, b) => a + b, 0) / frameTimesRef.current.length
+        setFps(Math.round(1000 / avgDelta))
+      }
+      
+      animationFrameRef.current = requestAnimationFrame(measureFps)
+    }
+    
+    animationFrameRef.current = requestAnimationFrame(measureFps)
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+    }
+  }, [settings.showFps])
   
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
@@ -33,6 +80,22 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: Ga
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
+      {/* FPS Counter */}
+      <AnimatePresence>
+        {settings.showFps && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute top-2 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+          >
+            <div className="px-2 py-0.5 bg-black/70 border border-gray-700/50 rounded text-xs font-mono text-gray-400">
+              {fps} FPS
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-auto">
         {/* Left side - Mode and score */}
@@ -94,12 +157,57 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: Ga
 
         {/* Right side - Stats and controls */}
         <div className="text-right space-y-2">
-          <button
-            className="font-tekken text-sm tracking-wider text-gray-500 hover:text-white transition-colors"
-            onClick={onPause}
-          >
-            PAUSE [ESC]
-          </button>
+          <div className="flex items-center justify-end gap-3">
+            {/* Settings dropdown */}
+            <div className="relative">
+              <button
+                className="font-tekken text-sm tracking-wider text-gray-500 hover:text-white transition-colors"
+                onClick={() => setSettingsOpen(!settingsOpen)}
+              >
+                ⚙
+              </button>
+              
+              <AnimatePresence>
+                {settingsOpen && (
+                  <>
+                    {/* Backdrop to close dropdown */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setSettingsOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-8 z-50 bg-black/95 border border-gray-700 rounded-lg p-3 min-w-[160px] shadow-xl"
+                    >
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={settings.showFps}
+                            onChange={(e) => setShowFps(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-tekken-gold focus:ring-tekken-gold/50 cursor-pointer"
+                          />
+                          <span className="font-tekken text-xs tracking-wider text-gray-400 group-hover:text-white transition-colors">
+                            SHOW FPS
+                          </span>
+                        </label>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <button
+              className="font-tekken text-sm tracking-wider text-gray-500 hover:text-white transition-colors"
+              onClick={onPause}
+            >
+              PAUSE [ESC]
+            </button>
+          </div>
           
           <div className="space-y-1">
             <div className="flex items-center justify-end gap-2">
@@ -152,6 +260,24 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: Ga
 
       {/* Bottom - Input display (hidden on mobile/touch devices - touch controls shown instead) */}
       <div className="absolute bottom-4 right-4 flex gap-2 items-end pointer-events-none hidden lg:flex">
+        {/* Controller indicator */}
+        {controllerConnected && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-1.5 mr-3 px-2 py-1 rounded bg-black/50 border border-green-500/50"
+          >
+            <svg 
+              className="w-4 h-4 text-green-400" 
+              viewBox="0 0 24 24" 
+              fill="currentColor"
+            >
+              <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+            </svg>
+            <span className="text-[10px] font-tekken text-green-400 tracking-wider">CONTROLLER</span>
+          </motion.div>
+        )}
+        
         {/* Direction keys - S and D only */}
         <div className="flex gap-1">
           <div className={`
