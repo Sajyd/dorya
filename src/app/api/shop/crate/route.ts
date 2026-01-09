@@ -35,10 +35,10 @@ export async function POST(request: Request) {
           doryaCoins: 500,
           inventory: {
             create: {
-              ownedItems: (() => {
-              const defaults = getDefaultItems()
-              return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
-            })(),
+              ownedItems: JSON.stringify((() => {
+                const defaults = getDefaultItems()
+                return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
+              })()),
             },
           },
         },
@@ -79,7 +79,21 @@ export async function POST(request: Request) {
 
     // Open crate
     const items = rollCrateItems(crate)
-    const ownedItems = (player.inventory?.ownedItems as string[]) || []
+    
+    // Parse ownedItems - it may be stored as JSON string or array
+    let ownedItems: string[] = []
+    const rawOwnedItems = player.inventory?.ownedItems
+    if (rawOwnedItems) {
+      if (typeof rawOwnedItems === 'string') {
+        try {
+          ownedItems = JSON.parse(rawOwnedItems)
+        } catch {
+          ownedItems = []
+        }
+      } else if (Array.isArray(rawOwnedItems)) {
+        ownedItems = rawOwnedItems
+      }
+    }
     
     // Add new items to inventory
     const newItemIds: string[] = []
@@ -95,13 +109,13 @@ export async function POST(request: Request) {
       }
     })
 
-    // Update inventory with new items
+    // Update inventory with new items - save as JSON string for consistency
     if (newItemIds.length > 0 || refundCoins > 0) {
       await prisma.$transaction([
         prisma.playerInventory.update({
           where: { playerId: player.id },
           data: {
-            ownedItems: [...ownedItems, ...newItemIds],
+            ownedItems: JSON.stringify([...ownedItems, ...newItemIds]),
           },
         }),
         ...(refundCoins > 0 ? [
@@ -154,12 +168,14 @@ export async function POST(request: Request) {
           skinColor: item.skinColor,
           clothColor: item.clothColor,
           glowColor: item.glowColor,
+          preview: item.preview,
         }
       } else if (item.category === 'dummy') {
         return {
           ...baseItem,
           skinColor: item.skinColor,
           clothColor: item.clothColor,
+          preview: item.preview,
         }
       }
       return baseItem

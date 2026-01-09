@@ -35,7 +35,7 @@ export async function POST(request: Request) {
           doryaCoins: 500,
           inventory: {
             create: {
-              ownedItems: ['stage_classic', 'electric_blue', 'char_mishima', 'dummy_classic'],
+              ownedItems: JSON.stringify(['stage_classic', 'electric_blue', 'char_mishima', 'dummy_classic']),
             },
           },
         },

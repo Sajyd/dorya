@@ -26,10 +26,10 @@ export async function POST(request: Request) {
           doryaCoins: 500 + amount,
           inventory: {
             create: {
-              ownedItems: (() => {
-              const defaults = getDefaultItems()
-              return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
-            })(),
+              ownedItems: JSON.stringify((() => {
+                const defaults = getDefaultItems()
+                return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
+              })()),
             },
           },
         },
@@ -81,10 +81,10 @@ export async function PUT(request: Request) {
           premiumCoins: amount,
           inventory: {
             create: {
-              ownedItems: (() => {
-              const defaults = getDefaultItems()
-              return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
-            })(),
+              ownedItems: JSON.stringify((() => {
+                const defaults = getDefaultItems()
+                return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
+              })()),
             },
           },
         },

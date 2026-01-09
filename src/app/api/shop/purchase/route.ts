@@ -34,7 +34,7 @@ export async function POST(request: Request) {
           doryaCoins: 500, // Starting coins
           inventory: {
             create: {
-              ownedItems: ['stage_classic', 'electric_blue', 'electric_gold', 'char_mishima', 'dummy_classic'],
+              ownedItems: JSON.stringify(['stage_classic', 'electric_blue', 'electric_gold', 'char_mishima', 'dummy_classic']),
             },
           },
         },
@@ -42,8 +42,20 @@ export async function POST(request: Request) {
       })
     }
 
-    // Check if already owned
-    const ownedItems = (player.inventory?.ownedItems as string[]) || []
+    // Check if already owned - parse ownedItems (may be JSON string or array)
+    let ownedItems: string[] = []
+    const rawOwnedItems = player.inventory?.ownedItems
+    if (rawOwnedItems) {
+      if (typeof rawOwnedItems === 'string') {
+        try {
+          ownedItems = JSON.parse(rawOwnedItems)
+        } catch {
+          ownedItems = []
+        }
+      } else if (Array.isArray(rawOwnedItems)) {
+        ownedItems = rawOwnedItems
+      }
+    }
     if (ownedItems.includes(itemId)) {
       return NextResponse.json(
         { error: 'Item already owned' },
@@ -82,11 +94,11 @@ export async function POST(request: Request) {
       })
     }
 
-    // Add item to inventory
+    // Add item to inventory - save as JSON string for consistency
     await prisma.playerInventory.update({
       where: { playerId: player.id },
       data: {
-        ownedItems: [...ownedItems, itemId],
+        ownedItems: JSON.stringify([...ownedItems, itemId]),
       },
     })
 

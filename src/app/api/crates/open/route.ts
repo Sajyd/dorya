@@ -75,7 +75,20 @@ export async function POST(request: Request) {
       )
     }
     
-    const ownedItems = (purchasedCrate.player.inventory?.ownedItems as string[]) || []
+    // Parse ownedItems - it may be stored as JSON string or array
+    let ownedItems: string[] = []
+    const rawOwnedItems = purchasedCrate.player.inventory?.ownedItems
+    if (rawOwnedItems) {
+      if (typeof rawOwnedItems === 'string') {
+        try {
+          ownedItems = JSON.parse(rawOwnedItems)
+        } catch {
+          ownedItems = []
+        }
+      } else if (Array.isArray(rawOwnedItems)) {
+        ownedItems = rawOwnedItems
+      }
+    }
     
     // Add new items to inventory
     const newItemIds: string[] = []
@@ -102,12 +115,12 @@ export async function POST(request: Request) {
           itemsReceived: items.map(i => i.id),
         },
       }),
-      // Update inventory
+      // Update inventory - save as JSON string for consistency
       ...(newItemIds.length > 0 ? [
         prisma.playerInventory.update({
           where: { playerId: purchasedCrate.playerId },
           data: {
-            ownedItems: [...ownedItems, ...newItemIds],
+            ownedItems: JSON.stringify([...ownedItems, ...newItemIds]),
           },
         }),
       ] : []),
@@ -160,12 +173,14 @@ export async function POST(request: Request) {
           skinColor: item.skinColor,
           clothColor: item.clothColor,
           glowColor: item.glowColor,
+          preview: item.preview,
         }
       } else if (item.category === 'dummy') {
         return {
           ...baseItem,
           skinColor: item.skinColor,
           clothColor: item.clothColor,
+          preview: item.preview,
         }
       }
       return baseItem

@@ -88,41 +88,34 @@ export function useGameInput(
   }, [])
 
   // Check if inputs form a valid wavedash motion (f → n → d → df) without punch
+  // Note: Buffer always starts with forward, so inputs[0] is always 'f'
   const checkWavedashMotion = useCallback((inputs: CommandInput[]): WavedashAttempt | null => {
-    // Find the key inputs (direction only, no button)
-    const forwardInput = inputs.find(i => i.direction === 'f' && i.button === 'none')
+    // Buffer must start with forward (guaranteed by processInput)
+    if (inputs.length === 0 || inputs[0].direction !== 'f') {
+      return null
+    }
+    
+    const dfInput = inputs.find(i => i.direction === 'df' && i.button === 'none')
+    if (!dfInput) {
+      return null
+    }
+    
+    // Find neutral and down inputs (they'll be after forward since buffer starts with f)
     const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
     const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
-    const dfInput = inputs.find(i => i.direction === 'df' && i.button === 'none')
-    
-    // Must have all four inputs for a wavedash
-    if (!forwardInput || !dfInput) {
-      return null
-    }
-    
-    // Check sequence order: f → ... → df
-    if (forwardInput.timestamp > dfInput.timestamp) {
-      return null
-    }
     
     // Check if we have the clean motion: f → n → d → df
     let isClean = false
     if (neutralInput && downInput) {
       // Full clean motion: f → n → d → df
-      if (forwardInput.timestamp < neutralInput.timestamp &&
-          neutralInput.timestamp < downInput.timestamp &&
-          downInput.timestamp < dfInput.timestamp) {
+      if (neutralInput.timestamp < downInput.timestamp && downInput.timestamp < dfInput.timestamp) {
         isClean = true
       }
-    } else if (downInput) {
+    } else if (downInput && downInput.timestamp < dfInput.timestamp) {
       // Acceptable: f → d → df (skipped neutral)
-      if (forwardInput.timestamp < downInput.timestamp &&
-          downInput.timestamp < dfInput.timestamp) {
-        isClean = true
-      }
+      isClean = true
     }
     
-    // Valid wavedash motion
     return {
       inputs: [...inputs],
       timestamp: Date.now(),
@@ -131,39 +124,30 @@ export function useGameInput(
   }, [])
 
   // Check if inputs form a valid WGF motion (f → n → d → df+2) regardless of timing
+  // Note: Buffer always starts with forward, so inputs[0] is always 'f'
   const checkWGFMotion = useCallback((inputs: CommandInput[]): boolean => {
-    // Find the key inputs
-    const forwardInput = inputs.find(i => i.direction === 'f' && i.button === 'none')
+    // Buffer must start with forward (guaranteed by processInput)
+    if (inputs.length === 0 || inputs[0].direction !== 'f') {
+      return false
+    }
+    
+    const dfPunchInput = inputs.find(i => i.direction === 'df' && i.button === '2')
+    if (!dfPunchInput) {
+      return false
+    }
+    
+    // Find neutral and down inputs (they'll be after forward since buffer starts with f)
     const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
     const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
-    const dfPunchInput = inputs.find(i => i.direction === 'df' && i.button === '2')
-    
-    // Must have forward and df+2 at minimum
-    if (!forwardInput || !dfPunchInput) {
-      return false
-    }
-    
-    // Check sequence order: forward must come before df+2
-    if (forwardInput.timestamp > dfPunchInput.timestamp) {
-      return false
-    }
     
     // If we have neutral and down, check they're in order: f → n → d → df+2
     if (neutralInput && downInput) {
-      if (forwardInput.timestamp > neutralInput.timestamp ||
-          neutralInput.timestamp > downInput.timestamp ||
-          downInput.timestamp > dfPunchInput.timestamp) {
-        return false
-      }
-    } else if (downInput) {
-      // f → d → df+2 pattern
-      if (forwardInput.timestamp > downInput.timestamp ||
-          downInput.timestamp > dfPunchInput.timestamp) {
+      if (neutralInput.timestamp > downInput.timestamp) {
         return false
       }
     }
     
-    // Valid WGF motion!
+    // Valid WGF motion! (f → df+2 with optional n and/or d in between)
     return true
   }, [])
 
@@ -176,28 +160,29 @@ export function useGameInput(
     //   - f, n, d, df, df+2 (separate df after d)
     //   - f, df, df+2 (no neutral or down, just held forward)
     
-    // Find the key inputs
-    const forwardInput = inputs.find(i => i.direction === 'f' && i.button === 'none')
-    const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
-    const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
+    // Buffer must start with forward (guaranteed by processInput)
+    if (inputs.length === 0 || inputs[0].direction !== 'f') {
+      return null
+    }
+    
+    const forwardInput = inputs[0]
     const dfPunchInput = inputs.find(i => i.direction === 'df' && i.button === '2')
     const dfNoPunchInput = inputs.find(i => i.direction === 'df' && i.button === 'none')
     
-    // Must have forward and df+2
-    if (!forwardInput || !dfPunchInput) {
+    // Must have df+2
+    if (!dfPunchInput) {
       return null
     }
     
-    // Check sequence order: forward must come before df+2
-    if (forwardInput.timestamp > dfPunchInput.timestamp) {
-      return null
-    }
+    // Find neutral and down inputs (they'll be after forward since buffer starts with f)
+    const neutralInput = inputs.find(i => i.direction === 'n' && i.button === 'none')
+    const downInput = inputs.find(i => i.direction === 'd' && i.button === 'none')
     
-    // INVALID: If there's any df (without punch) in the sequence after forward
+    // INVALID: If there's any df (without punch) in the sequence
     // This means df and df+2 were on different frames (otherwise df would be replaced by df+2)
     // Catches: f, n, df, df+2 | f, df, df+2 | f, n, d, df, df+2 | etc.
     // A valid EWGF must go directly from d to df+2, not through a separate df input
-    if (dfNoPunchInput && dfNoPunchInput.timestamp > forwardInput.timestamp) {
+    if (dfNoPunchInput) {
       return null
     }
     
@@ -219,14 +204,10 @@ export function useGameInput(
     let frameDiff: number
     
     // Check for f, n, df+2 pattern (PEWGF via neutral)
-    const hasNeutralBetween = neutralInput && 
-      neutralInput.timestamp > forwardInput.timestamp && 
-      neutralInput.timestamp < dfPunchInput.timestamp
+    const hasNeutralBetween = !!neutralInput
     
     // Check for f, d, df+2 pattern (EWGF via down input)
-    const hasDownBetween = downInput && 
-      downInput.timestamp > forwardInput.timestamp && 
-      downInput.timestamp < dfPunchInput.timestamp
+    const hasDownBetween = !!downInput
     
     if (hasNeutralBetween && !hasDownBetween) {
       // True PEWGF: f → n → df+2 (return to neutral, then direct to df+2)
@@ -292,6 +273,54 @@ export function useGameInput(
       frame,
     }
     
+    // Update state machine first
+    const state = stateRef.current
+    
+    // EWGF detection starts with forward - reset buffer and begin fresh attempt
+    if (direction === 'f' && button === 'none') {
+      // Clear any previous incomplete attempt and start fresh
+      inputBufferRef.current = [input]
+      hasProcessedAttemptRef.current = false
+      state.hasForward = true
+      state.hasDown = false
+      state.lastDirection = 'f'
+      setCurrentInputs([input])
+      setInputHistory(prev => [...prev.slice(-19), input])
+      
+      // Reset timeout for this new attempt
+      if (inputWindowRef.current) {
+        clearTimeout(inputWindowRef.current)
+      }
+      inputWindowRef.current = setTimeout(() => {
+        if (inputBufferRef.current.length > 0) {
+          const hasPunch = inputBufferRef.current.some(i => i.button === '2')
+          if (hasPunch && !hasProcessedAttemptRef.current) {
+            hasProcessedAttemptRef.current = true
+            const hadValidMotion = checkWGFMotion(inputBufferRef.current)
+            const missAttempt: DoryaAttempt = {
+              inputs: [...inputBufferRef.current],
+              result: 'miss',
+              timing: -1,
+              timestamp: Date.now(),
+              validMotion: hadValidMotion,
+            }
+            setLastAttempt(missAttempt)
+            onDoryaAttempt(missAttempt)
+          }
+          resetInputs()
+        }
+      }, 500)
+      
+      return
+    }
+    
+    // For all other inputs, only add to buffer if we have an active attempt (hasForward)
+    if (!state.hasForward) {
+      // No active attempt - just update history for display but don't process
+      setInputHistory(prev => [...prev.slice(-19), input])
+      return
+    }
+    
     // Check if last input was on the same frame - if so, replace it instead of adding
     // This handles cases like pressing d+f together which fires separate keydown events
     // but should only show "df" (or "df+2") not "d, df" (or "df, df+2")
@@ -308,59 +337,47 @@ export function useGameInput(
       setInputHistory(prev => [...prev.slice(-19), input]) // Keep last 20 inputs
     }
     
-    // Update state machine
-    const state = stateRef.current
-    
-    if (direction === 'f' && button === 'none') {
-      state.hasForward = true
-      state.hasDown = false
-      state.lastDirection = 'f'
-    } else if (direction === 'd' && button === 'none') {
-      if (state.hasForward) {
-        state.hasDown = true
-        state.downFrame = frame
-      }
+    // At this point, we have an active attempt (hasForward is true)
+    // Process the remaining input types
+    if (direction === 'd' && button === 'none') {
+      state.hasDown = true
+      state.downFrame = frame
       state.lastDirection = 'd'
     } else if (direction === 'df' && button === 'none') {
       // Wavedash detected: f → n → d → df (without punch)
-      if (state.hasForward) {
-        const wavedash = checkWavedashMotion(inputBufferRef.current)
-        if (wavedash) {
-          setLastWavedash(wavedash)
-          onWavedash?.(wavedash)
-        }
+      const wavedash = checkWavedashMotion(inputBufferRef.current)
+      if (wavedash) {
+        setLastWavedash(wavedash)
+        onWavedash?.(wavedash)
       }
       state.lastDirection = 'df'
     } else if (direction === 'df' && button === '2') {
-      // Check for EWGF completion
-      // Allow completion if we have f → df+2 (PEWGF) or f → d → df+2 (EWGF)
-      if (state.hasForward) {
-        const attempt = checkDoryaInput(inputBufferRef.current)
-        if (attempt) {
-          hasProcessedAttemptRef.current = true
-          setLastAttempt(attempt)
-          onDoryaAttempt(attempt)
-          resetInputs()
-          return
-        } else {
-          // The motion was attempted but timing was off - trigger miss immediately
-          const hadValidMotion = checkWGFMotion(inputBufferRef.current)
-          hasProcessedAttemptRef.current = true
-          const missAttempt: DoryaAttempt = {
-            inputs: [...inputBufferRef.current],
-            result: 'miss',
-            timing: -1,
-            timestamp: Date.now(),
-            validMotion: hadValidMotion,
-          }
-          setLastAttempt(missAttempt)
-          onDoryaAttempt(missAttempt)
-          resetInputs()
-          return
+      // Check for EWGF completion: f → n → d → df+2 or f → n → df+2
+      const attempt = checkDoryaInput(inputBufferRef.current)
+      if (attempt) {
+        hasProcessedAttemptRef.current = true
+        setLastAttempt(attempt)
+        onDoryaAttempt(attempt)
+        resetInputs()
+        return
+      } else {
+        // The motion was attempted but invalid - trigger miss immediately
+        const hadValidMotion = checkWGFMotion(inputBufferRef.current)
+        hasProcessedAttemptRef.current = true
+        const missAttempt: DoryaAttempt = {
+          inputs: [...inputBufferRef.current],
+          result: 'miss',
+          timing: -1,
+          timestamp: Date.now(),
+          validMotion: hadValidMotion,
         }
+        setLastAttempt(missAttempt)
+        onDoryaAttempt(missAttempt)
+        resetInputs()
+        return
       }
     } else if (button === '2') {
-      // Punch pressed without proper motion - trigger miss immediately
+      // Punch pressed without df (e.g., f → n → d+2 instead of df+2)
       hasProcessedAttemptRef.current = true
       const hadValidMotion = checkWGFMotion(inputBufferRef.current)
       const missAttempt: DoryaAttempt = {
@@ -375,32 +392,6 @@ export function useGameInput(
       resetInputs()
       return
     }
-    
-    // Reset input buffer after timeout (input window)
-    if (inputWindowRef.current) {
-      clearTimeout(inputWindowRef.current)
-    }
-    inputWindowRef.current = setTimeout(() => {
-      // If we didn't complete an EWGF, it's a miss
-      if (inputBufferRef.current.length > 0) {
-        const hasPunch = inputBufferRef.current.some(i => i.button === '2')
-        if (hasPunch && !hasProcessedAttemptRef.current) {
-          hasProcessedAttemptRef.current = true
-          // Check if inputs formed a valid WGF motion (f → n → d → df+2) even if timing was off
-          const hadValidMotion = checkWGFMotion(inputBufferRef.current)
-          const missAttempt: DoryaAttempt = {
-            inputs: [...inputBufferRef.current],
-            result: 'miss',
-            timing: -1,
-            timestamp: Date.now(),
-            validMotion: hadValidMotion,
-          }
-          setLastAttempt(missAttempt)
-          onDoryaAttempt(missAttempt)
-        }
-        resetInputs()
-      }
-    }, 500) // 500ms input window
     
     lastInputTimeRef.current = now
   }, [getCurrentFrame, checkDoryaInput, checkWavedashMotion, checkWGFMotion, onDoryaAttempt, onWavedash, resetInputs])
