@@ -401,9 +401,14 @@ export function getItemsByRarity(rarity: string): ShopItem[] {
   return getAllItems().filter(item => item.rarity === rarity)
 }
 
+// Get all paid (non-free) items
+export function getPaidItems(): ShopItem[] {
+  return getAllItems().filter(item => item.price > 0)
+}
+
 // Get random item based on rarity weights
-export function getRandomItem(weights: LootCrate['rarityWeights']): ShopItem {
-  const allItems = getAllItems().filter(item => item.price > 0) // Exclude free items
+export function getRandomItem(weights: LootCrate['rarityWeights'], excludeIds: string[] = []): ShopItem {
+  const allItems = getPaidItems().filter(item => !excludeIds.includes(item.id))
   const rarityOrder: ('common' | 'rare' | 'epic' | 'legendary')[] = ['common', 'rare', 'epic', 'legendary']
   const totalWeight = weights.common + weights.rare + weights.epic + weights.legendary
   const random = Math.random() * totalWeight
@@ -431,35 +436,102 @@ export function getRandomItem(weights: LootCrate['rarityWeights']): ShopItem {
     }
   }
   
-  // If still no items, use any paid item
+  // If still no items at higher rarities, try lower rarities
   if (itemsOfRarity.length === 0) {
-    itemsOfRarity = allItems
+    const currentRarityIndex = rarityOrder.indexOf(rarity)
+    for (let r = currentRarityIndex - 1; r >= 0; r--) {
+      itemsOfRarity = allItems.filter(item => item.rarity === rarityOrder[r])
+      if (itemsOfRarity.length > 0) break
+    }
+  }
+  
+  // If still no items (all excluded), use all paid items without exclusion
+  if (itemsOfRarity.length === 0) {
+    itemsOfRarity = getPaidItems()
+  }
+  
+  // Final fallback - should never happen but ensures we always return an item
+  if (itemsOfRarity.length === 0) {
+    return getAllItems()[0]
   }
   
   return itemsOfRarity[Math.floor(Math.random() * itemsOfRarity.length)]
 }
 
-// Simulate opening a crate
+// Minimum guaranteed items per crate type
+const MIN_ITEMS_PER_CRATE: Record<string, number> = {
+  'basic': 1,
+  'premium': 3,
+  'legendary': 5,
+}
+
+// Simulate opening a crate - always guarantees minimum items
 export function openCrate(crate: LootCrate): ShopItem[] {
   const items: ShopItem[] = []
-  const allItems = getAllItems().filter(item => item.price > 0) // Exclude free items
+  const allPaidItems = getPaidItems()
   const rarityOrder: ('common' | 'rare' | 'epic' | 'legendary')[] = ['common', 'rare', 'epic', 'legendary']
   
-  for (let i = 0; i < crate.itemCount; i++) {
+  // Get the minimum required items for this crate type
+  const minItems = MIN_ITEMS_PER_CRATE[crate.id] || crate.itemCount
+  const targetItemCount = Math.max(minItems, crate.itemCount)
+  
+  // Track items we've already added to try to avoid duplicates within the same crate
+  const addedItemIds: string[] = []
+  
+  for (let i = 0; i < targetItemCount; i++) {
+    let item: ShopItem | undefined
+    
     // First item gets guaranteed rarity if applicable
     if (i === 0 && crate.guaranteedRarity) {
-      let guaranteedItems = allItems.filter(item => {
-        return rarityOrder.indexOf(item.rarity) >= rarityOrder.indexOf(crate.guaranteedRarity!)
+      let guaranteedItems = allPaidItems.filter(item => {
+        return rarityOrder.indexOf(item.rarity) >= rarityOrder.indexOf(crate.guaranteedRarity!) &&
+               !addedItemIds.includes(item.id)
       })
       
-      // Fallback if no items meet the guaranteed rarity
+      // Fallback if no items meet the guaranteed rarity (without exclusion)
       if (guaranteedItems.length === 0) {
-        guaranteedItems = allItems
+        guaranteedItems = allPaidItems.filter(item => {
+          return rarityOrder.indexOf(item.rarity) >= rarityOrder.indexOf(crate.guaranteedRarity!)
+        })
       }
       
-      items.push(guaranteedItems[Math.floor(Math.random() * guaranteedItems.length)])
+      // Final fallback to any paid item
+      if (guaranteedItems.length === 0) {
+        guaranteedItems = allPaidItems
+      }
+      
+      item = guaranteedItems[Math.floor(Math.random() * guaranteedItems.length)]
     } else {
-      items.push(getRandomItem(crate.rarityWeights))
+      // Try to get a unique item first
+      item = getRandomItem(crate.rarityWeights, addedItemIds)
+    }
+    
+    // Ensure we always have an item
+    if (!item) {
+      item = allPaidItems[Math.floor(Math.random() * allPaidItems.length)]
+    }
+    
+    // Final safety check - if somehow we still don't have an item, use any item
+    if (!item) {
+      const allItems = getAllItems()
+      item = allItems[Math.floor(Math.random() * allItems.length)]
+    }
+    
+    if (item) {
+      items.push(item)
+      addedItemIds.push(item.id)
+    }
+  }
+  
+  // Guarantee we have at least the minimum items - keep adding until we do
+  while (items.length < minItems) {
+    const randomItem = allPaidItems[Math.floor(Math.random() * allPaidItems.length)]
+    if (randomItem) {
+      items.push(randomItem)
+    } else {
+      // Absolute last resort
+      const allItems = getAllItems()
+      items.push(allItems[0])
     }
   }
   
