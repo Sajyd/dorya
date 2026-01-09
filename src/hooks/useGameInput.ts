@@ -14,6 +14,9 @@ const BUTTON_KEYS: Record<string, InputButton> = {
   'KeyK': '2',  // Right punch (2 in Tekken notation)
 }
 
+// Valid keys that the game accepts
+const VALID_KEYS = new Set(['KeyD', 'KeyS', 'KeyK'])
+
 // Frame timing (60fps = ~16.67ms per frame)
 const FRAME_MS = 1000 / 60
 
@@ -470,6 +473,9 @@ export function useGameInput(
       if (e.repeat) return
       
       const code = e.code
+      // Only process valid game keys (D, S, K)
+      if (!VALID_KEYS.has(code)) return
+      
       keyboardKeysRef.current.add(code)
       
       // Combine keyboard and touch keys
@@ -481,6 +487,9 @@ export function useGameInput(
 
     const handleKeyUp = (e: KeyboardEvent) => {
       const code = e.code
+      // Only process valid game keys (D, S, K)
+      if (!VALID_KEYS.has(code)) return
+      
       keyboardKeysRef.current.delete(code)
       
       // Combine keyboard and touch keys
