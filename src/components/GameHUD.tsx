@@ -191,20 +191,26 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-8 z-50 bg-black/95 border border-gray-700 rounded-lg p-3 min-w-[160px] shadow-xl"
+                      className="absolute right-0 top-14 md:top-12 z-50 bg-black/95 backdrop-blur-md border border-gray-700 rounded-lg p-4 min-w-[180px] shadow-xl"
                     >
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={settings.showFps}
-                            onChange={(e) => setShowFps(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-tekken-gold focus:ring-tekken-gold/50 cursor-pointer"
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-tekken text-xs tracking-wider text-gray-300">
+                          SHOW FPS
+                        </span>
+                        <button
+                          onClick={() => setShowFps(!settings.showFps)}
+                          className={`w-12 h-6 rounded-full transition-all duration-300 relative flex-shrink-0 ${
+                            settings.showFps 
+                              ? 'bg-tekken-gold' 
+                              : 'bg-gray-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
+                              settings.showFps ? 'left-[26px]' : 'left-[2px]'
+                            }`}
                           />
-                          <span className="font-tekken text-xs tracking-wider text-gray-400 group-hover:text-white transition-colors">
-                            SHOW FPS
-                          </span>
-                        </label>
+                        </button>
                       </div>
                     </motion.div>
                   </>
