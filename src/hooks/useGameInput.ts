@@ -209,25 +209,48 @@ export function useGameInput(
     // Check for f, d, df+2 pattern (EWGF via down input)
     const hasDownBetween = !!downInput
     
+    // EWGF can only be performed during wavedash state (~20 frame window)
+    const WAVEDASH_WINDOW_FRAMES = 20
+    
     if (hasNeutralBetween && !hasDownBetween) {
-      // True PEWGF: f → n → df+2 (return to neutral, then direct to df+2)
-      // This is the cleanest perfect electric - 13 frame startup
-      result = 'perfect'
-      frameDiff = 0
-    } else if (hasDownBetween) {
-      // Calculate timing: frames between d and df+2
+      // f → n → df+2 pattern (PEWGF only)
+      // This pattern is ONLY valid as PEWGF (n must be exactly 1 frame)
+      // If n is held longer, it's a MISS - player should use f → n → d → df+2 for regular EWGF
+      const nToDfFrames = dfPunchInput.frame - neutralInput!.frame
+      frameDiff = nToDfFrames
+      
+      if (nToDfFrames === 1) {
+        // True PEWGF: neutral held for exactly 1 frame
+        result = 'perfect'
+      } else {
+        // f → n → df+2 with n held longer than 1 frame is invalid
+        // This is a MISS - not a valid EWGF pattern
+        return null
+      }
+    } else if (hasDownBetween && !hasNeutralBetween) {
+      // f → d → df+2 pattern (PEWGF only, no neutral)
+      // This pattern is ONLY valid as PEWGF (d must be exactly 1 frame)
       frameDiff = dfPunchInput.frame - downInput!.frame
       
-      // EWGF can only be performed during wavedash state (~20 frame window)
-      const WAVEDASH_WINDOW_FRAMES = 20
+      if (frameDiff === 1) {
+        // PEWGF: down held for exactly 1 frame before df+2
+        result = 'perfect'
+      } else {
+        // f → d → df+2 with d held longer than 1 frame is invalid
+        // This is a MISS - not a valid EWGF pattern
+        return null
+      }
+    } else if (hasDownBetween && hasNeutralBetween) {
+      // f → n → d → df+2 pattern (Regular EWGF)
+      // This is the standard EWGF motion
+      frameDiff = dfPunchInput.frame - downInput!.frame
       
       if (frameDiff > WAVEDASH_WINDOW_FRAMES) {
         // Outside wavedash window - no longer in wavedash state, not a valid EWGF
         return null
-      } else if (frameDiff <= 1) {
-        // PEWGF: d and df+2 on same frame or 1-frame gap
-        // f(1f) → d(1f) → df+2(1f) = perfect timing
-        result = 'perfect'
+      } else if (frameDiff === 1) {
+        // Excellent timing on regular EWGF motion
+        result = 'good'
       } else if (frameDiff <= 3) {
         // Good EWGF - 2-3 frame gap
         result = 'good'

@@ -32,33 +32,21 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
   // Live frame counter for the current neutral state
   const [liveFrameCount, setLiveFrameCount] = useState(0)
   
-  // Get the last input to check if we're in neutral
+  // Get the last input for live counter
   const lastInput = inputs[inputs.length - 1]
-  const isInNeutral = lastInput?.direction === 'n'
   
-  // Calculate frame counts for each input (frames since last non-neutral input)
+  // Calculate frame counts for each input (how long each input was held)
   const frameCountsForInputs = useMemo(() => {
     const counts: number[] = []
-    let lastNonNeutralFrame: number | null = null
     
     for (let i = 0; i < inputs.length; i++) {
-      const input = inputs[i]
-      
-      if (input.direction === 'n') {
-        // For neutral inputs, show frames since last non-neutral
-        if (lastNonNeutralFrame !== null) {
-          counts.push(input.frame - lastNonNeutralFrame)
-        } else {
-          counts.push(0)
-        }
+      if (i < inputs.length - 1) {
+        // Duration = when next input started - when this input started
+        const duration = inputs[i + 1].frame - inputs[i].frame
+        counts.push(Math.max(1, duration))
       } else {
-        // For non-neutral inputs, show frames since previous non-neutral (or 0 if first)
-        if (lastNonNeutralFrame !== null) {
-          counts.push(input.frame - lastNonNeutralFrame)
-        } else {
-          counts.push(0)
-        }
-        lastNonNeutralFrame = input.frame
+        // Last input - will use live counter if neutral, otherwise show 1
+        counts.push(1)
       }
     }
     
@@ -68,40 +56,27 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
   // Get frame counts only for displayed inputs
   const displayFrameCounts = frameCountsForInputs.slice(-8)
   
-  // Live counter effect - ticks while in neutral
+  // Live counter effect - ticks for the last input to show how long it's been held
   useEffect(() => {
-    if (!isInNeutral || !lastInput) {
-      setLiveFrameCount(0)
+    if (!lastInput) {
+      setLiveFrameCount(1)
       return
     }
     
-    // Find the last non-neutral input to calculate initial count
-    let lastNonNeutralFrame: number | null = null
-    for (let i = inputs.length - 1; i >= 0; i--) {
-      if (inputs[i].direction !== 'n') {
-        lastNonNeutralFrame = inputs[i].frame
-        break
-      }
-    }
-    
-    if (lastNonNeutralFrame === null) {
-      setLiveFrameCount(0)
-      return
-    }
-    
-    // Start the live counter
-    const startFrame = lastNonNeutralFrame
+    // Start counting from the last input's frame
+    const startFrame = lastInput.frame
     
     const updateCounter = () => {
       const currentFrame = Math.floor(performance.now() / FRAME_MS)
-      setLiveFrameCount(currentFrame - startFrame)
+      const diff = currentFrame - startFrame
+      setLiveFrameCount(Math.max(1, diff))
     }
     
     updateCounter() // Initial update
     const intervalId = setInterval(updateCounter, FRAME_MS)
     
     return () => clearInterval(intervalId)
-  }, [isInNeutral, lastInput, inputs])
+  }, [lastInput])
 
   return (
     <div className="bg-black/70 border border-gray-800 rounded-lg p-2 md:p-4 min-w-[140px] md:min-w-[200px]">
@@ -114,8 +89,8 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
         <AnimatePresence mode="popLayout">
           {displayInputs.map((input, index) => {
             const isLastInput = index === displayInputs.length - 1
-            const isNeutralAndLast = isLastInput && input.direction === 'n'
-            const frameCount = isNeutralAndLast ? liveFrameCount : displayFrameCounts[index]
+            // Last input always uses live counter (shows how long currently held)
+            const frameCount = isLastInput ? liveFrameCount : displayFrameCounts[index]
             
             return (
               <motion.div
@@ -129,10 +104,10 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
                 {/* Frame counter above input */}
                 <span className={`
                   font-mono text-[8px] md:text-[10px] mb-0.5
-                  ${input.direction === 'n' ? 'text-gray-600' : 'text-cyan-400'}
-                  ${isNeutralAndLast ? 'animate-pulse' : ''}
+                  ${directionColors[input.direction] || 'text-gray-400'}
+                  ${isLastInput ? 'animate-pulse' : ''}
                 `}>
-                  {frameCount > 0 ? `${frameCount}f` : ''}
+                  {frameCount}f
                 </span>
                 
                 {/* Input box */}
