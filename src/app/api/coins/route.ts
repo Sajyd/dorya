@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getDefaultItems } from '@/lib/customization-data'
+import { getDefaultItems } from '@/lib/customizationData'
 
 // POST - Add coins (from gameplay)
 export async function POST(request: Request) {
@@ -26,7 +26,10 @@ export async function POST(request: Request) {
           doryaCoins: 500 + amount,
           inventory: {
             create: {
-              ownedItems: getDefaultItems(),
+              ownedItems: (() => {
+              const defaults = getDefaultItems()
+              return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
+            })(),
             },
           },
         },
@@ -78,7 +81,10 @@ export async function PUT(request: Request) {
           premiumCoins: amount,
           inventory: {
             create: {
-              ownedItems: getDefaultItems(),
+              ownedItems: (() => {
+              const defaults = getDefaultItems()
+              return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
+            })(),
             },
           },
         },

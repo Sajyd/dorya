@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { LOOT_CRATES, openCrate } from '@/lib/customization-data'
+import { LOOT_CRATES, rollCrateItems } from '@/lib/customizationData'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       if (!itemIds) {
         const crate = LOOT_CRATES.find(c => c.id === purchasedCrate.crateType)
         if (crate) {
-          const items = openCrate(crate)
+          const items = rollCrateItems(crate)
           itemIds = items.map(item => item.id)
         }
       }

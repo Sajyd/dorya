@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { LOOT_CRATES, openCrate, getDefaultItems } from '@/lib/customization-data'
+import { LOOT_CRATES, rollCrateItems, getDefaultItems } from '@/lib/customizationData'
 import { CrateType } from '@/types/game'
 
 export async function POST(request: Request) {
@@ -35,7 +35,10 @@ export async function POST(request: Request) {
           doryaCoins: 500,
           inventory: {
             create: {
-              ownedItems: getDefaultItems(),
+              ownedItems: (() => {
+              const defaults = getDefaultItems()
+              return [defaults.stage.id, defaults.electricColor.id, defaults.character.id, defaults.dummy.id]
+            })(),
             },
           },
         },
@@ -75,7 +78,7 @@ export async function POST(request: Request) {
     }
 
     // Open crate
-    const items = openCrate(crate)
+    const items = rollCrateItems(crate)
     const ownedItems = (player.inventory?.ownedItems as string[]) || []
     
     // Add new items to inventory

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { LOOT_CRATES, openCrate, getItemById } from '@/lib/customization-data'
+import { LOOT_CRATES, rollCrateItems, getItemById } from '@/lib/customizationData'
 
 export async function POST(request: Request) {
   try {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     let itemIds = purchasedCrate.itemsReceived as string[] | null
     if (!itemIds || itemIds.length === 0) {
       // Fallback: generate items now if webhook/verify didn't set them
-      const generatedItems = openCrate(crate)
+      const generatedItems = rollCrateItems(crate)
       itemIds = generatedItems.map(item => item.id)
     }
     

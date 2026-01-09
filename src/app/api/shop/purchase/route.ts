@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getItemById } from '@/lib/customization-data'
+import { getItemById } from '@/lib/customizationData'
 
 export async function POST(request: Request) {
   try {

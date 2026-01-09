@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { stripe, CRATE_AMOUNTS } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { LOOT_CRATES } from '@/lib/customization-data'
+import { LOOT_CRATES } from '@/lib/customizationData'
 import { CrateType } from '@/types/game'
 
 export async function POST(request: Request) {

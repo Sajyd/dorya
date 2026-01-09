@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { LOOT_CRATES, openCrate } from '@/lib/customization-data'
+import { LOOT_CRATES, rollCrateItems } from '@/lib/customizationData'
 import Stripe from 'stripe'
 
 export async function POST(request: Request) {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         
         if (crate) {
           // Pre-determine the items at purchase time
-          const items = openCrate(crate)
+          const items = rollCrateItems(crate)
           const itemIds = items.map(item => item.id)
           
           // Update the crate with payment ID and pre-determined items
