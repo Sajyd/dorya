@@ -20,6 +20,11 @@ interface PlayerData {
     selectedElectricColor: string
     selectedCharacter: string
     selectedDummy: string
+    keybindings?: {
+      forward: string
+      down: string
+      punch: string
+    }
   }
 }
 
