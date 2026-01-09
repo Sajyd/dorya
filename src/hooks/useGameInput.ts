@@ -196,14 +196,9 @@ export function useGameInput(
     // INVALID: If there's any df (without punch) in the sequence after forward
     // This means df and df+2 were on different frames (otherwise df would be replaced by df+2)
     // Catches: f, n, df, df+2 | f, df, df+2 | f, n, d, df, df+2 | etc.
-    // HOWEVER: Allow if df and df+2 are within 1 frame (same input motion split across frame boundary)
-    // This handles cases where player transitions from d to df+2 but keyboard events fire separately
+    // A valid EWGF must go directly from d to df+2, not through a separate df input
     if (dfNoPunchInput && dfNoPunchInput.timestamp > forwardInput.timestamp) {
-      const frameDiffDfToDfPunch = dfPunchInput.frame - dfNoPunchInput.frame
-      // Only invalidate if df was held for more than 1 frame before pressing punch
-      if (frameDiffDfToDfPunch > 1) {
-        return null
-      }
+      return null
     }
     
     // INVALID: Check for extra forwards after neutral
