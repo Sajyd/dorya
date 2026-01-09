@@ -151,28 +151,9 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: Ga
       </AnimatePresence>
 
       {/* Bottom - Input display (hidden on mobile/touch devices - touch controls shown instead) */}
-      <div className="absolute bottom-4 right-4 flex gap-2 pointer-events-none hidden lg:flex">
-        {/* Direction keys */}
-        <div className="grid grid-cols-3 gap-1">
-          <div />
-          <div className={`
-            w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
-            ${isKeyActive('KeyW') 
-              ? 'border-electric-blue bg-electric-blue/30 text-electric-blue' 
-              : 'border-gray-700 bg-black/50 text-gray-600'}
-          `}>
-            W
-          </div>
-          <div />
-          
-          <div className={`
-            w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
-            ${isKeyActive('KeyA') 
-              ? 'border-electric-blue bg-electric-blue/30 text-electric-blue' 
-              : 'border-gray-700 bg-black/50 text-gray-600'}
-          `}>
-            A
-          </div>
+      <div className="absolute bottom-4 right-4 flex gap-2 items-end pointer-events-none hidden lg:flex">
+        {/* Direction keys - S and D only */}
+        <div className="flex gap-1">
           <div className={`
             w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
             ${isKeyActive('KeyS') 
@@ -193,8 +174,7 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack }: Ga
 
         {/* Attack button */}
         <div className={`
-          w-12 h-12 rounded-full border-2 flex items-center justify-center font-tekken text-lg self-end
-          transition-all duration-100
+          w-12 h-12 rounded-full border-2 flex items-center justify-center font-tekken text-lg
           ${isKeyActive('KeyK') 
             ? 'border-tekken-gold bg-tekken-gold/30 text-tekken-gold shadow-[0_0_20px_rgba(255,215,0,0.5)]' 
             : 'border-gray-700 bg-black/50 text-gray-600'}
