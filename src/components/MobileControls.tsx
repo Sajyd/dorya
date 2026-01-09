@@ -15,6 +15,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   // Ref to store the latest onInputChange to avoid stale closures
   const onInputChangeRef = useRef(onInputChange)
   onInputChangeRef.current = onInputChange
+  // Track last reported keys to avoid duplicate notifications
+  const lastReportedKeysRef = useRef<string>('')
 
   // Detect mobile/touch device
   useEffect(() => {
@@ -39,15 +41,22 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
     return button?.dataset.mobileKey || null
   }, [])
 
-  // Sync keys from touches and update state
+  // Sync keys from touches and update state - only notify if keys changed
   const syncKeysFromTouches = useCallback(() => {
     const keysFromTouches = new Set<string>()
     activeTouchesRef.current.forEach((key) => {
       if (key) keysFromTouches.add(key)
     })
     
-    setActiveKeys(new Set(keysFromTouches))
-    onInputChangeRef.current(new Set(keysFromTouches))
+    // Convert to sorted string for comparison
+    const keysString = Array.from(keysFromTouches).sort().join(',')
+    
+    // Only update and notify if keys actually changed
+    if (keysString !== lastReportedKeysRef.current) {
+      lastReportedKeysRef.current = keysString
+      setActiveKeys(new Set(keysFromTouches))
+      onInputChangeRef.current(new Set(keysFromTouches))
+    }
   }, [])
 
   // Process all current touches and update state
@@ -123,13 +132,25 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
   // Mouse handlers for desktop testing
   const mouseKeysRef = useRef<Set<string>>(new Set())
   
+  const notifyKeysChanged = useCallback((keys: Set<string>) => {
+    const keysString = Array.from(keys).sort().join(',')
+    if (keysString !== lastReportedKeysRef.current) {
+      lastReportedKeysRef.current = keysString
+      setActiveKeys(new Set(keys))
+      onInputChangeRef.current(new Set(keys))
+    }
+  }, [])
+  
   const handleMouseDown = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
     mouseKeysRef.current.add(key)
-    const combined = new Set([...activeKeys, ...mouseKeysRef.current])
-    setActiveKeys(combined)
-    onInputChangeRef.current(combined)
-  }, [activeKeys])
+    const keysFromTouches = new Set<string>()
+    activeTouchesRef.current.forEach((k) => {
+      if (k) keysFromTouches.add(k)
+    })
+    const combined = new Set([...keysFromTouches, ...mouseKeysRef.current])
+    notifyKeysChanged(combined)
+  }, [notifyKeysChanged])
 
   const handleMouseUp = useCallback((key: string) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -139,9 +160,8 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
       if (k) keysFromTouches.add(k)
     })
     const combined = new Set([...keysFromTouches, ...mouseKeysRef.current])
-    setActiveKeys(combined)
-    onInputChangeRef.current(combined)
-  }, [])
+    notifyKeysChanged(combined)
+  }, [notifyKeysChanged])
 
   if (!isMobile || !isPlaying) return null
 
