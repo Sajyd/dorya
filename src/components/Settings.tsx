@@ -28,7 +28,7 @@ export default function Settings({ onBack }: SettingsProps) {
   const [authLoading, setAuthLoading] = useState(false)
   const [authSuccess, setAuthSuccess] = useState(false)
 
-  const handleUsernameChange = () => {
+  const handleUsernameChange = async () => {
     setUsernameError(null)
     setUsernameSaved(false)
     
@@ -54,7 +54,7 @@ export default function Settings({ onBack }: SettingsProps) {
       return
     }
     
-    const success = updateGuestUsername(clean)
+    const success = await updateGuestUsername(clean)
     if (success) {
       setUsernameSaved(true)
       setNewUsername(clean)
