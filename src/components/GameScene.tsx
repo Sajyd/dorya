@@ -149,13 +149,16 @@ function ElectricEffect({
     }
     
     return () => {
-      // Cleanup on unmount - remove from parent groups first, then dispose
+      // Cleanup on unmount - hide, remove from parent groups, then dispose
       boltLinesRef.current.forEach(line => {
+        line.visible = false
         boltsRef.current?.remove(line)
         line.geometry.dispose()
         ;(line.material as THREE.Material).dispose()
       })
       sparkMeshesRef.current.forEach(mesh => {
+        mesh.visible = false
+        mesh.scale.setScalar(0)
         sparksRef.current?.remove(mesh)
         mesh.geometry.dispose()
         ;(mesh.material as THREE.Material).dispose()
@@ -755,12 +758,15 @@ function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean
     } else if (!active) {
       // Immediately hide all particles when deactivated
       isActiveRef.current = false
-      meshesRef.current.forEach(mesh => { mesh.visible = false })
-      // Reset particle data to prevent stale state
-      particleDataRef.current.forEach(p => {
-        p.life = 0
-        p.scale = 0
+      // Force hide all meshes and reset their state completely
+      meshesRef.current.forEach(mesh => { 
+        mesh.visible = false
+        mesh.scale.setScalar(0)
+        mesh.position.set(0, 0, 0)
+        ;(mesh.material as THREE.MeshBasicMaterial).opacity = 0
       })
+      // Reset particle data to prevent stale state
+      particleDataRef.current = []
     }
   }, [active])
 
@@ -1016,8 +1022,8 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
         />
       </Suspense>
       
-      {/* Impact effect */}
-      <ImpactEffect active={showImpact} position={[0.5, 2.5, 0]} color={impactColor} />
+      {/* Impact effect - positioned near opponent */}
+      <ImpactEffect active={showImpact} position={[opponentX * 0.3, 2.5, 0]} color={impactColor} />
       
       <ScreenShake intensity={shakeIntensity} />
       
