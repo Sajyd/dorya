@@ -1,0 +1,16 @@
+# DORYA! - Electric Wind God Fist Training
+# https://dorya.gg
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://dorya.gg/sitemap.xml
+
+# Block API routes from indexing
+Disallow: /api/
+
+# Block private/internal paths
+Disallow: /_next/
+Disallow: /static/
+
