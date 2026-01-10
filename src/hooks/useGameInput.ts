@@ -342,7 +342,7 @@ export function useGameInput(
     // but should only show "df+2" not "df, df+2" (which would be invalid)
     // 1 frame window (~16ms) for simultaneous button presses
     const lastInput = inputBufferRef.current[inputBufferRef.current.length - 1]
-    const SIMULTANEOUS_WINDOW_FRAMES = 2
+    const SIMULTANEOUS_WINDOW_FRAMES = 1
     if (lastInput && (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES) {
       // Same frame - replace the previous input with the combined state
       inputBufferRef.current[inputBufferRef.current.length - 1] = input
