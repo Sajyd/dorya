@@ -731,7 +731,7 @@ function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean
     })
   }, [color])
 
-  // Reset particles when becoming active
+  // Reset particles when becoming active, hide when inactive
   useEffect(() => {
     if (active && !isActiveRef.current) {
       isActiveRef.current = true
@@ -753,7 +753,14 @@ function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean
       
       meshesRef.current.forEach(mesh => { mesh.visible = true })
     } else if (!active) {
+      // Immediately hide all particles when deactivated
       isActiveRef.current = false
+      meshesRef.current.forEach(mesh => { mesh.visible = false })
+      // Reset particle data to prevent stale state
+      particleDataRef.current.forEach(p => {
+        p.life = 0
+        p.scale = 0
+      })
     }
   }, [active])
 
@@ -897,38 +904,52 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
   
   // Handle attempt results - trigger animation on ANY attempt including misses
   useEffect(() => {
-    if (lastAttempt) {
-      const isSuccess = lastAttempt.result === 'perfect' || lastAttempt.result === 'good' || lastAttempt.result === 'bad'
-      const isMissWithValidMotion = lastAttempt.result === 'miss' && lastAttempt.validMotion === true
-      setIsPerfect(lastAttempt.result === 'perfect')
+    if (!lastAttempt) return
+    
+    const isSuccess = lastAttempt.result === 'perfect' || lastAttempt.result === 'good' || lastAttempt.result === 'bad'
+    const isMissWithValidMotion = lastAttempt.result === 'miss' && lastAttempt.validMotion === true
+    
+    // Immediately reset previous particle effects before starting new ones
+    setShowImpact(false)
+    setShouldShowElectric(false)
+    
+    setIsPerfect(lastAttempt.result === 'perfect')
+    
+    let hitTimer: ReturnType<typeof setTimeout> | null = null
+    let resetTimer: ReturnType<typeof setTimeout> | null = null
+    
+    // Trigger attack animation on success OR miss with valid WGF motion (f, n, d, df+2)
+    if (isSuccess || isMissWithValidMotion) {
+      setIsAttacking(true)
+      setAttackTrigger(prev => prev + 1)
       
-      // Trigger attack animation on success OR miss with valid WGF motion (f, n, d, df+2)
-      if (isSuccess || isMissWithValidMotion) {
-        setIsAttacking(true)
-        setAttackTrigger(prev => prev + 1)
-        
-        // Only show electric effect on successful hits (not on miss)
-        setShouldShowElectric(isSuccess)
-        
-        // Only trigger hit reaction on successful hits (not on miss)
-        if (isSuccess) {
-          setTimeout(() => {
-            setIsHit(true)
-            setHitTrigger(prev => prev + 1)
-            setShowImpact(true)
-            setShakeIntensity(lastAttempt.result === 'perfect' ? 2.0 : 1.0)
-          }, 100) // Adjusted for 2x speed
-        }
+      // Only show electric effect on successful hits (not on miss)
+      setShouldShowElectric(isSuccess)
+      
+      // Only trigger hit reaction on successful hits (not on miss)
+      if (isSuccess) {
+        hitTimer = setTimeout(() => {
+          setIsHit(true)
+          setHitTrigger(prev => prev + 1)
+          setShowImpact(true)
+          setShakeIntensity(lastAttempt.result === 'perfect' ? 2.0 : 1.0)
+        }, 100) // Adjusted for 2x speed
       }
-      
-      // Reset states
-      setTimeout(() => {
-        setIsAttacking(false)
-        setIsHit(false)
-        setShowImpact(false)
-        setShakeIntensity(0)
-        setShouldShowElectric(false)
-      }, 1500)
+    }
+    
+    // Reset states
+    resetTimer = setTimeout(() => {
+      setIsAttacking(false)
+      setIsHit(false)
+      setShowImpact(false)
+      setShakeIntensity(0)
+      setShouldShowElectric(false)
+    }, 1500)
+    
+    // Cleanup timeouts when a new attempt triggers or component unmounts
+    return () => {
+      if (hitTimer) clearTimeout(hitTimer)
+      if (resetTimer) clearTimeout(resetTimer)
     }
   }, [lastAttempt])
 
