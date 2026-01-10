@@ -5,9 +5,10 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 interface MobileControlsProps {
   isPlaying: boolean
   onInputChange: (keys: Set<string>) => void
+  playerSide?: 'p1' | 'p2'
 }
 
-export default function MobileControls({ isPlaying, onInputChange }: MobileControlsProps) {
+export default function MobileControls({ isPlaying, onInputChange, playerSide = 'p1' }: MobileControlsProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set())
   // Track which touch identifiers are pressing which keys
@@ -174,20 +175,46 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
         <div className="pointer-events-auto">
           {/* Arcade stick style layout */}
           <div className="relative">
-            {/* Direction buttons side by side: Down on left, Forward on right */}
+            {/* Direction buttons: Backward, Down, Forward */}
             <div className="flex items-center gap-2">
+              {/* Backward button - becomes Forward on P2 side */}
+              <button
+                data-mobile-key="KeyA"
+                className={`
+                  w-16 h-16 rounded-2xl
+                  flex flex-col items-center justify-center
+                  font-tekken text-lg tracking-wider
+                  select-none touch-none
+                  bg-black/60 backdrop-blur-sm
+                  border-2
+                  ${isKeyActive('KeyA')
+                    ? playerSide === 'p2'
+                      ? 'border-electric-blue text-electric-blue'
+                      : 'border-gray-500 text-gray-400'
+                    : 'border-gray-600 text-gray-500'
+                  }
+                `}
+                onMouseDown={handleMouseDown('KeyA')}
+                onMouseUp={handleMouseUp('KeyA')}
+                onMouseLeave={handleMouseUp('KeyA')}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <span className="text-xl font-bold">←</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">{playerSide === 'p2' ? 'FWD' : 'BACK'}</span>
+              </button>
+              
               {/* Down button */}
               <button
                 data-mobile-key="KeyS"
                 className={`
-                  w-20 h-20 rounded-2xl
+                  w-16 h-16 rounded-2xl
                   flex flex-col items-center justify-center
                   font-tekken text-lg tracking-wider
                   select-none touch-none
                   bg-black/60 backdrop-blur-sm
                   border-2
                   ${isKeyActive('KeyS')
-                    ? 'border-electric-blue text-electric-blue' 
+                    ? 'border-electric-purple text-electric-purple' 
                     : 'border-gray-600 text-gray-400'
                   }
                 `}
@@ -196,22 +223,24 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
                 onMouseLeave={handleMouseUp('KeyS')}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <span className="text-2xl font-bold">↓</span>
-                <span className="text-xs text-gray-500 mt-0.5">DOWN</span>
+                <span className="text-xl font-bold">↓</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">DOWN</span>
               </button>
               
-              {/* Forward button */}
+              {/* Forward button - becomes Backward on P2 side */}
               <button
                 data-mobile-key="KeyD"
                 className={`
-                  w-20 h-20 rounded-2xl
+                  w-16 h-16 rounded-2xl
                   flex flex-col items-center justify-center
                   font-tekken text-lg tracking-wider
                   select-none touch-none
                   bg-black/60 backdrop-blur-sm
                   border-2
                   ${isKeyActive('KeyD')
-                    ? 'border-electric-blue text-electric-blue' 
+                    ? playerSide === 'p1'
+                      ? 'border-electric-blue text-electric-blue'
+                      : 'border-gray-500 text-gray-400'
                     : 'border-gray-600 text-gray-400'
                   }
                 `}
@@ -220,15 +249,15 @@ export default function MobileControls({ isPlaying, onInputChange }: MobileContr
                 onMouseLeave={handleMouseUp('KeyD')}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <span className="text-2xl font-bold">→</span>
-                <span className="text-xs text-gray-500 mt-0.5">FWD</span>
+                <span className="text-xl font-bold">→</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">{playerSide === 'p1' ? 'FWD' : 'BACK'}</span>
               </button>
             </div>
             
             {/* Visual hint for df combo */}
             <div className="absolute left-1/2 -translate-x-1/2 -top-8 text-gray-600 text-xs font-mono whitespace-nowrap">
               <div className="text-center opacity-60">
-                <div>↓+→ = df</div>
+                <div>{playerSide === 'p2' ? '←+↓ = df' : '↓+→ = df'}</div>
               </div>
             </div>
           </div>

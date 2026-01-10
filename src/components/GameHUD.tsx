@@ -54,6 +54,7 @@ interface GameHUDProps {
   onBack: () => void
   controllerConnected?: boolean
   keybindings?: KeyBindings
+  playerSide?: 'p1' | 'p2'
 }
 
 const modeLabels: Record<GameMode, string> = {
@@ -63,7 +64,7 @@ const modeLabels: Record<GameMode, string> = {
   FREESTYLE: 'FREESTYLE',
 }
 
-export default function GameHUD({ mode, state, activeKeys, onPause, onBack, controllerConnected, keybindings = DEFAULT_KEYBINDINGS }: GameHUDProps) {
+export default function GameHUD({ mode, state, activeKeys, onPause, onBack, controllerConnected, keybindings = DEFAULT_KEYBINDINGS, playerSide = 'p1' }: GameHUDProps) {
   const { user } = useUser()
   const { settings } = useAudio()
   const [fps, setFps] = useState(0)
@@ -285,8 +286,20 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
           </motion.div>
         )}
         
-        {/* Direction keys - Down and Forward */}
+        {/* Direction keys - Backward, Down, and Forward */}
         <div className="flex gap-1">
+          {/* Backward key - highlighted on P2 side as it becomes forward */}
+          <div className={`
+            w-10 h-10 rounded border-2 flex flex-col items-center justify-center font-mono text-xs
+            ${isKeyActive(keybindings.backward || 'KeyA') 
+              ? playerSide === 'p2'
+                ? 'border-electric-blue bg-electric-blue/30 text-electric-blue'
+                : 'border-gray-500 bg-gray-500/30 text-gray-400'
+              : 'border-gray-700 bg-black/50 text-gray-600'}
+          `}>
+            <span>{getKeyDisplayName(keybindings.backward || 'KeyA')}</span>
+            {playerSide === 'p2' && <span className="text-[8px] opacity-70">FWD</span>}
+          </div>
           <div className={`
             w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
             ${isKeyActive(keybindings.down) 
@@ -295,13 +308,17 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
           `}>
             {getKeyDisplayName(keybindings.down)}
           </div>
+          {/* Forward key - highlighted on P1 side */}
           <div className={`
-            w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
+            w-10 h-10 rounded border-2 flex flex-col items-center justify-center font-mono text-xs
             ${isKeyActive(keybindings.forward) 
-              ? 'border-electric-blue bg-electric-blue/30 text-electric-blue' 
+              ? playerSide === 'p1'
+                ? 'border-electric-blue bg-electric-blue/30 text-electric-blue'
+                : 'border-gray-500 bg-gray-500/30 text-gray-400'
               : 'border-gray-700 bg-black/50 text-gray-600'}
           `}>
-            {getKeyDisplayName(keybindings.forward)}
+            <span>{getKeyDisplayName(keybindings.forward)}</span>
+            {playerSide === 'p1' && <span className="text-[8px] opacity-70">FWD</span>}
           </div>
         </div>
 
