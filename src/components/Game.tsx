@@ -302,14 +302,14 @@ export default function Game({ mode, onBack }: GameProps) {
       <AnimatePresence>
         {showSideSelection && !state.isPlaying && !showResult && (
           <motion.div
-            className="absolute inset-0 z-35 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+            className="absolute inset-0 z-35 flex items-center justify-center bg-black/90 backdrop-blur-sm px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <div className="text-center">
               <motion.h2
-                className="font-display text-5xl text-white mb-4"
+                className="font-display text-3xl md:text-5xl text-white mb-2 md:mb-4"
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
               >
@@ -317,7 +317,7 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.h2>
               
               <motion.p
-                className="text-gray-400 mb-8 font-sans max-w-md"
+                className="text-gray-400 mb-4 md:mb-8 font-sans max-w-md text-sm md:text-base px-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -326,40 +326,40 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.p>
 
               <motion.div
-                className="flex gap-6 justify-center"
+                className="flex gap-3 md:gap-6 justify-center"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
                 <button
-                  className="group relative px-12 py-8 border-2 border-electric-blue rounded-lg hover:bg-electric-blue/20 transition-all"
+                  className="group relative px-6 py-4 md:px-12 md:py-8 border-2 border-electric-blue rounded-lg hover:bg-electric-blue/20 transition-all"
                   onClick={() => handleSelectSide('p1')}
                 >
-                  <div className="text-6xl mb-2">←</div>
-                  <div className="font-tekken text-2xl text-electric-blue tracking-wider">P1</div>
-                  <div className="text-gray-500 text-sm mt-2">Left Side</div>
-                  <div className="text-gray-600 text-xs mt-1">Forward = {getKeyDisplayName(keybindings.forward)}</div>
+                  <div className="text-4xl md:text-6xl mb-1 md:mb-2">←</div>
+                  <div className="font-tekken text-xl md:text-2xl text-electric-blue tracking-wider">P1</div>
+                  <div className="text-gray-500 text-xs md:text-sm mt-1 md:mt-2">Left Side</div>
+                  <div className="text-gray-600 text-[10px] md:text-xs mt-1 hidden md:block">Forward = {getKeyDisplayName(keybindings.forward)}</div>
                 </button>
                 
                 <button
-                  className="group relative px-12 py-8 border-2 border-tekken-gold rounded-lg hover:bg-tekken-gold/20 transition-all"
+                  className="group relative px-6 py-4 md:px-12 md:py-8 border-2 border-tekken-gold rounded-lg hover:bg-tekken-gold/20 transition-all"
                   onClick={() => handleSelectSide('p2')}
                 >
-                  <div className="text-6xl mb-2">→</div>
-                  <div className="font-tekken text-2xl text-tekken-gold tracking-wider">P2</div>
-                  <div className="text-gray-500 text-sm mt-2">Right Side</div>
-                  <div className="text-gray-600 text-xs mt-1">Forward = {getKeyDisplayName(keybindings.backward)}</div>
+                  <div className="text-4xl md:text-6xl mb-1 md:mb-2">→</div>
+                  <div className="font-tekken text-xl md:text-2xl text-tekken-gold tracking-wider">P2</div>
+                  <div className="text-gray-500 text-xs md:text-sm mt-1 md:mt-2">Right Side</div>
+                  <div className="text-gray-600 text-[10px] md:text-xs mt-1 hidden md:block">Forward = {getKeyDisplayName(keybindings.backward || 'KeyA')}</div>
                 </button>
               </motion.div>
 
               <motion.div
-                className="mt-8"
+                className="mt-6 md:mt-8"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
                 <button
-                  className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider"
+                  className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider text-sm md:text-base"
                   onClick={handleQuit}
                 >
                   ← BACK TO MENU
@@ -374,14 +374,14 @@ export default function Game({ mode, onBack }: GameProps) {
       <AnimatePresence>
         {!state.isPlaying && !showResult && !showSideSelection && (
           <motion.div
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <div className="text-center">
               <motion.h2
-                className="font-display text-6xl text-white mb-4"
+                className="font-display text-3xl md:text-6xl text-white mb-2 md:mb-4"
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
               >
@@ -389,7 +389,7 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.h2>
               
               <motion.p
-                className="text-gray-400 mb-8 font-sans"
+                className="text-gray-400 mb-4 md:mb-8 font-sans text-sm md:text-base px-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -402,13 +402,13 @@ export default function Game({ mode, onBack }: GameProps) {
 
               {/* Show selected side indicator */}
               <motion.div
-                className="mb-6 flex justify-center"
+                className="mb-4 md:mb-6 flex justify-center"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.25 }}
               >
                 <div className={`
-                  px-4 py-2 rounded-full border-2 font-tekken text-sm tracking-wider
+                  px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 font-tekken text-xs md:text-sm tracking-wider
                   ${activeSide === 'p1' ? 'border-electric-blue text-electric-blue' : 'border-tekken-gold text-tekken-gold'}
                 `}>
                   {activeSide === 'p1' ? '← PLAYER 1 SIDE' : 'PLAYER 2 SIDE →'}
@@ -416,13 +416,13 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.div>
 
               <motion.div
-                className="space-y-4"
+                className="space-y-3 md:space-y-4"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
                 <button
-                  className="menu-button text-tekken-gold border-tekken-gold hover:bg-tekken-gold hover:text-black"
+                  className="menu-button text-tekken-gold border-tekken-gold hover:bg-tekken-gold hover:text-black text-sm md:text-base px-6 md:px-8 py-2 md:py-3"
                   onClick={handleStart}
                 >
                   START
@@ -432,7 +432,7 @@ export default function Game({ mode, onBack }: GameProps) {
                 {keybindings.playerSide === 'ask' && (
                   <div>
                     <button
-                      className="text-gray-400 hover:text-white transition-colors font-tekken tracking-wider text-sm"
+                      className="text-gray-400 hover:text-white transition-colors font-tekken tracking-wider text-xs md:text-sm"
                       onClick={() => setShowSideSelection(true)}
                     >
                       CHANGE SIDE
@@ -442,7 +442,7 @@ export default function Game({ mode, onBack }: GameProps) {
                 
                 <div>
                   <button
-                    className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider"
+                    className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider text-xs md:text-base"
                     onClick={handleQuit}
                   >
                     ← BACK TO MENU
@@ -451,7 +451,7 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.div>
 
               <motion.div
-                className="mt-12 text-gray-600 font-mono text-sm"
+                className="mt-6 md:mt-12 text-gray-600 font-mono text-xs md:text-sm"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}

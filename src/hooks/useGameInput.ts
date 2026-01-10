@@ -500,7 +500,7 @@ export function useGameInput(
   }, [combineAllKeys, keybindings.punch, processKeyState])
 
   // Handle touch input from mobile controls
-  // Note: Touch controls still use KeyD/KeyS/KeyK internally as virtual keys
+  // Note: Touch controls use virtual keys: KeyA (←), KeyS (↓), KeyD (→), KeyK (punch)
   // This function buffers touch state and schedules processing for the next animation frame
   // to ensure all simultaneous touches are combined before being processed
   const handleTouchInput = useCallback((touchKeys: Set<string>) => {
@@ -508,10 +508,20 @@ export function useGameInput(
     
     const prevTouchKeys = new Set(touchKeysRef.current)
     
-    // Map virtual touch keys to actual keybindings
-    // On P2 side, forward touch maps to effectiveForwardKey (backward key)
+    // Map virtual touch keys to actual keybindings based on player side
+    // KeyD = physical right (→), KeyA = physical left (←)
+    // P1: right (KeyD/→) = forward, left (KeyA/←) = backward
+    // P2: left (KeyA/←) = forward, right (KeyD/→) = backward
     const mappedTouchKeys = new Set<string>()
-    if (touchKeys.has('KeyD')) mappedTouchKeys.add(effectiveForwardKey)
+    if (playerSide === 'p1') {
+      // P1: KeyD (→) is forward
+      if (touchKeys.has('KeyD')) mappedTouchKeys.add(effectiveForwardKey)
+      if (touchKeys.has('KeyA')) mappedTouchKeys.add(effectiveBackwardKey)
+    } else {
+      // P2: KeyA (←) is forward
+      if (touchKeys.has('KeyA')) mappedTouchKeys.add(effectiveForwardKey)
+      if (touchKeys.has('KeyD')) mappedTouchKeys.add(effectiveBackwardKey)
+    }
     if (touchKeys.has('KeyS')) mappedTouchKeys.add(keybindings.down)
     if (touchKeys.has('KeyK')) mappedTouchKeys.add(keybindings.punch)
     
@@ -537,7 +547,7 @@ export function useGameInput(
       touchFrameScheduledRef.current = true
       touchRafIdRef.current = requestAnimationFrame(processPendingTouchInput)
     }
-  }, [isPlaying, keybindings, effectiveForwardKey, processPendingTouchInput])
+  }, [isPlaying, keybindings, effectiveForwardKey, effectiveBackwardKey, playerSide, processPendingTouchInput])
   
   // Handle gamepad input
   // Note: Gamepad uses virtual keys internally, map to keybindings
