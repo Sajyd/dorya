@@ -898,6 +898,9 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
   const [hitTrigger, setHitTrigger] = useState(0)
   const [shouldShowElectric, setShouldShowElectric] = useState(false)
   
+  // Separate timer ref for shake to ensure clean resets
+  const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  
   // Get customization with defaults
   const stage = customization?.stage || STAGES[0]
   const electricColor = customization?.electricColor || ELECTRIC_COLORS[0]
@@ -919,6 +922,14 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
     setShowImpact(false)
     setShouldShowElectric(false)
     
+    // IMPORTANT: Immediately stop any existing shake and clear its timer
+    // This ensures shake resets at each new attempt, not stacking
+    if (shakeTimerRef.current) {
+      clearTimeout(shakeTimerRef.current)
+      shakeTimerRef.current = null
+    }
+    setShakeIntensity(0)
+    
     setIsPerfect(lastAttempt.result === 'perfect')
     
     let hitTimer: ReturnType<typeof setTimeout> | null = null
@@ -938,17 +949,25 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
           setIsHit(true)
           setHitTrigger(prev => prev + 1)
           setShowImpact(true)
-          setShakeIntensity(lastAttempt.result === 'perfect' ? 2.0 : 1.0)
+          
+          // Start fresh shake for this hit
+          const newIntensity = lastAttempt.result === 'perfect' ? 2.0 : 1.0
+          setShakeIntensity(newIntensity)
+          
+          // Set a dedicated timer to stop this shake (300ms duration)
+          shakeTimerRef.current = setTimeout(() => {
+            setShakeIntensity(0)
+            shakeTimerRef.current = null
+          }, 300)
         }, 100) // Adjusted for 2x speed
       }
     }
     
-    // Reset states
+    // Reset other states (but NOT shake - that's handled separately)
     resetTimer = setTimeout(() => {
       setIsAttacking(false)
       setIsHit(false)
       setShowImpact(false)
-      setShakeIntensity(0)
       setShouldShowElectric(false)
     }, 1500)
     
@@ -956,8 +975,19 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
     return () => {
       if (hitTimer) clearTimeout(hitTimer)
       if (resetTimer) clearTimeout(resetTimer)
+      // Note: shakeTimerRef is cleaned up at the START of new attempts, not here
+      // This prevents stale cleanup from affecting the new shake
     }
   }, [lastAttempt])
+  
+  // Cleanup shake timer on unmount
+  useEffect(() => {
+    return () => {
+      if (shakeTimerRef.current) {
+        clearTimeout(shakeTimerRef.current)
+      }
+    }
+  }, [])
 
   const impactColor = isPerfect ? '#ffd700' : (electricColor?.primaryColor || '#00d4ff')
   const fogColor = stage?.fogColor || '#000000'

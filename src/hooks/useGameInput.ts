@@ -337,11 +337,13 @@ export function useGameInput(
       return
     }
     
-    // Check if last input was on the same frame - if so, replace it instead of adding
-    // This handles cases like pressing d+f together which fires separate keydown events
-    // but should only show "df" (or "df+2") not "d, df" (or "df, df+2")
+    // Check if last input was within 1 frame - if so, replace it instead of adding
+    // This handles cases like pressing d+f+2 together which fires separate keydown events
+    // but should only show "df+2" not "df, df+2" (which would be invalid)
+    // 1 frame window (~16ms) for simultaneous button presses
     const lastInput = inputBufferRef.current[inputBufferRef.current.length - 1]
-    if (lastInput && lastInput.frame === frame) {
+    const SIMULTANEOUS_WINDOW_FRAMES = 1
+    if (lastInput && (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES) {
       // Same frame - replace the previous input with the combined state
       inputBufferRef.current[inputBufferRef.current.length - 1] = input
       setCurrentInputs([...inputBufferRef.current])
