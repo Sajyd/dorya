@@ -63,6 +63,38 @@ export default function Game({ mode, onBack }: GameProps) {
   const [selectedSide, setSelectedSide] = useState<'p1' | 'p2' | null>(null)
   const [showSideSelection, setShowSideSelection] = useState(false)
   
+  // Viewport scale for mobile responsiveness (based on height)
+  const [uiScale, setUiScale] = useState(1)
+  
+  // Track viewport height and calculate scale
+  useEffect(() => {
+    const calculateScale = () => {
+      const vh = window.innerHeight
+      const vw = window.innerWidth
+      // For landscape mobile (height < 500px and width > height), scale down
+      if (vh < 500 && vw > vh) {
+        // Scale proportionally: at 300px height use 0.5, at 500px use 1
+        const scale = Math.max(0.5, Math.min(1, vh / 500))
+        setUiScale(scale)
+      } else if (vh < 600) {
+        // Portrait small screens
+        const scale = Math.max(0.7, Math.min(1, vh / 600))
+        setUiScale(scale)
+      } else {
+        setUiScale(1)
+      }
+    }
+    
+    calculateScale()
+    window.addEventListener('resize', calculateScale)
+    window.addEventListener('orientationchange', calculateScale)
+    
+    return () => {
+      window.removeEventListener('resize', calculateScale)
+      window.removeEventListener('orientationchange', calculateScale)
+    }
+  }, [])
+  
   // Get audio settings
   const { settings: audioSettings } = useAudio()
   
@@ -302,14 +334,17 @@ export default function Game({ mode, onBack }: GameProps) {
       <AnimatePresence>
         {showSideSelection && !state.isPlaying && !showResult && (
           <motion.div
-            className="absolute inset-0 z-35 flex items-center justify-center bg-black/90 backdrop-blur-sm px-3 py-2 landscape:py-1"
+            className="absolute inset-0 z-35 flex items-center justify-center bg-black/90 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="text-center max-w-xs sm:max-w-md md:max-w-lg w-full max-h-full overflow-y-auto">
+            <div 
+              className="text-center"
+              style={{ transform: `scale(${uiScale})`, transformOrigin: 'center center' }}
+            >
               <motion.h2
-                className="font-display text-xl landscape:text-lg sm:text-3xl md:text-5xl text-white mb-1 landscape:mb-0.5 sm:mb-2 md:mb-4"
+                className="font-display text-3xl sm:text-4xl md:text-5xl text-white mb-2 sm:mb-3 md:mb-4"
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
               >
@@ -317,7 +352,7 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.h2>
               
               <motion.p
-                className="text-gray-400 mb-2 landscape:mb-1 sm:mb-4 md:mb-8 font-sans max-w-md mx-auto text-[10px] landscape:text-[9px] sm:text-sm md:text-base px-2 landscape:hidden sm:landscape:block"
+                className="text-gray-400 mb-4 sm:mb-6 md:mb-8 font-sans max-w-md mx-auto text-sm md:text-base px-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -326,43 +361,43 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.p>
 
               <motion.div
-                className="flex gap-2 sm:gap-3 md:gap-6 justify-center"
+                className="flex gap-4 sm:gap-5 md:gap-6 justify-center"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
                 <button
-                  className="group relative px-3 py-2 landscape:px-4 landscape:py-1.5 sm:px-6 sm:py-4 md:px-12 md:py-8 border-2 border-electric-blue rounded-lg hover:bg-electric-blue/20 transition-all"
+                  className="group relative px-8 py-5 sm:px-10 sm:py-6 md:px-12 md:py-8 border-2 border-electric-blue rounded-lg hover:bg-electric-blue/20 transition-all"
                   onClick={() => handleSelectSide('p1')}
                 >
-                  <div className="text-xl landscape:text-lg sm:text-4xl md:text-6xl mb-0 landscape:mb-0 sm:mb-1 md:mb-2">←</div>
-                  <div className="font-tekken text-sm landscape:text-xs sm:text-xl md:text-2xl text-electric-blue tracking-wider">P1</div>
-                  <div className="text-gray-500 text-[9px] landscape:text-[8px] sm:text-xs md:text-sm mt-0 sm:mt-1 md:mt-2">Left Side</div>
+                  <div className="text-4xl sm:text-5xl md:text-6xl mb-1 md:mb-2">←</div>
+                  <div className="font-tekken text-xl sm:text-2xl text-electric-blue tracking-wider">P1</div>
+                  <div className="text-gray-500 text-xs sm:text-sm mt-1 md:mt-2">Left Side</div>
                   <div className="text-gray-600 text-[10px] md:text-xs mt-1 hidden md:block">Forward = {getKeyDisplayName(keybindings.forward)}</div>
                 </button>
                 
                 <button
-                  className="group relative px-3 py-2 landscape:px-4 landscape:py-1.5 sm:px-6 sm:py-4 md:px-12 md:py-8 border-2 border-tekken-gold rounded-lg hover:bg-tekken-gold/20 transition-all"
+                  className="group relative px-8 py-5 sm:px-10 sm:py-6 md:px-12 md:py-8 border-2 border-tekken-gold rounded-lg hover:bg-tekken-gold/20 transition-all"
                   onClick={() => handleSelectSide('p2')}
                 >
-                  <div className="text-xl landscape:text-lg sm:text-4xl md:text-6xl mb-0 landscape:mb-0 sm:mb-1 md:mb-2">→</div>
-                  <div className="font-tekken text-sm landscape:text-xs sm:text-xl md:text-2xl text-tekken-gold tracking-wider">P2</div>
-                  <div className="text-gray-500 text-[9px] landscape:text-[8px] sm:text-xs md:text-sm mt-0 sm:mt-1 md:mt-2">Right Side</div>
+                  <div className="text-4xl sm:text-5xl md:text-6xl mb-1 md:mb-2">→</div>
+                  <div className="font-tekken text-xl sm:text-2xl text-tekken-gold tracking-wider">P2</div>
+                  <div className="text-gray-500 text-xs sm:text-sm mt-1 md:mt-2">Right Side</div>
                   <div className="text-gray-600 text-[10px] md:text-xs mt-1 hidden md:block">Forward = {getKeyDisplayName(keybindings.backward || 'KeyA')}</div>
                 </button>
               </motion.div>
 
               <motion.div
-                className="mt-2 landscape:mt-1 sm:mt-6 md:mt-8"
+                className="mt-6 sm:mt-7 md:mt-8"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
                 <button
-                  className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider text-[10px] landscape:text-[9px] sm:text-sm md:text-base"
+                  className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider text-sm md:text-base"
                   onClick={handleQuit}
                 >
-                  ← BACK
+                  ← BACK TO MENU
                 </button>
               </motion.div>
             </div>
@@ -374,14 +409,17 @@ export default function Game({ mode, onBack }: GameProps) {
       <AnimatePresence>
         {!state.isPlaying && !showResult && !showSideSelection && (
           <motion.div
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 backdrop-blur-sm px-3 py-2 landscape:py-1"
+            className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="text-center max-w-xs sm:max-w-sm md:max-w-lg w-full max-h-full overflow-y-auto">
+            <div 
+              className="text-center"
+              style={{ transform: `scale(${uiScale})`, transformOrigin: 'center center' }}
+            >
               <motion.h2
-                className="font-display text-xl landscape:text-lg sm:text-4xl md:text-6xl text-white mb-0.5 landscape:mb-0 sm:mb-2 md:mb-4"
+                className="font-display text-4xl sm:text-5xl md:text-6xl text-white mb-2 sm:mb-3 md:mb-4"
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
               >
@@ -389,7 +427,7 @@ export default function Game({ mode, onBack }: GameProps) {
               </motion.h2>
               
               <motion.p
-                className="text-gray-400 mb-2 landscape:mb-1 sm:mb-4 md:mb-8 font-sans text-[10px] landscape:text-[9px] sm:text-sm md:text-base px-2 landscape:line-clamp-1"
+                className="text-gray-400 mb-4 sm:mb-6 md:mb-8 font-sans text-sm md:text-base px-4 max-w-md mx-auto"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -402,27 +440,27 @@ export default function Game({ mode, onBack }: GameProps) {
 
               {/* Show selected side indicator */}
               <motion.div
-                className="mb-2 landscape:mb-1 sm:mb-4 md:mb-6 flex justify-center"
+                className="mb-4 sm:mb-5 md:mb-6 flex justify-center"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.25 }}
               >
                 <div className={`
-                  px-2 py-0.5 landscape:py-0.5 sm:px-3 sm:py-1.5 md:px-4 md:py-2 rounded-full border-2 font-tekken text-[9px] landscape:text-[8px] sm:text-xs md:text-sm tracking-wider
+                  px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border-2 font-tekken text-xs sm:text-sm tracking-wider
                   ${activeSide === 'p1' ? 'border-electric-blue text-electric-blue' : 'border-tekken-gold text-tekken-gold'}
                 `}>
-                  {activeSide === 'p1' ? '← P1' : 'P2 →'}
+                  {activeSide === 'p1' ? '← PLAYER 1 SIDE' : 'PLAYER 2 SIDE →'}
                 </div>
               </motion.div>
 
               <motion.div
-                className="space-y-1 landscape:space-y-0.5 sm:space-y-3 md:space-y-4"
+                className="space-y-3 sm:space-y-4"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
                 <button
-                  className="menu-button text-tekken-gold border-tekken-gold hover:bg-tekken-gold hover:text-black text-[10px] landscape:text-[9px] sm:text-sm md:text-base px-4 landscape:px-5 sm:px-6 md:px-8 py-1 landscape:py-0.5 sm:py-2 md:py-3"
+                  className="menu-button text-tekken-gold border-tekken-gold hover:bg-tekken-gold hover:text-black text-sm md:text-base px-6 sm:px-8 py-2 sm:py-3"
                   onClick={handleStart}
                 >
                   START
@@ -432,7 +470,7 @@ export default function Game({ mode, onBack }: GameProps) {
                 {keybindings.playerSide === 'ask' && (
                   <div>
                     <button
-                      className="text-gray-400 hover:text-white transition-colors font-tekken tracking-wider text-[9px] landscape:text-[8px] sm:text-xs md:text-sm"
+                      className="text-gray-400 hover:text-white transition-colors font-tekken tracking-wider text-xs sm:text-sm"
                       onClick={() => setShowSideSelection(true)}
                     >
                       CHANGE SIDE
@@ -442,16 +480,16 @@ export default function Game({ mode, onBack }: GameProps) {
                 
                 <div>
                   <button
-                    className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider text-[9px] landscape:text-[8px] sm:text-xs md:text-base"
+                    className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider text-xs sm:text-sm md:text-base"
                     onClick={handleQuit}
                   >
-                    ← BACK
+                    ← BACK TO MENU
                   </button>
                 </div>
               </motion.div>
 
               <motion.div
-                className="mt-2 landscape:mt-1 sm:mt-6 md:mt-12 text-gray-600 font-mono text-[9px] landscape:text-[8px] sm:text-xs md:text-sm"
+                className="mt-8 sm:mt-10 md:mt-12 text-gray-600 font-mono text-xs sm:text-sm"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
@@ -479,9 +517,9 @@ export default function Game({ mode, onBack }: GameProps) {
                     </>
                   )}
                 </div>
-                {/* Mobile controls hint - hidden in landscape to save space */}
-                <div className="md:hidden landscape:hidden text-[9px]">
-                  <p>→ Release → ↓ → ↓+→+🔴</p>
+                {/* Mobile controls hint */}
+                <div className="md:hidden text-xs">
+                  <p>Touch: → Release → ↓ → ↓+→+🔴</p>
                 </div>
               </motion.div>
             </div>
