@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GameMode, ActiveCustomization, WavedashAttempt } from '@/types/game'
+import { GameMode, ActiveCustomization, WavedashAttempt, PlayerSide } from '@/types/game'
 import { useGameState } from '@/hooks/useGameState'
 import { useGameInput } from '@/hooks/useGameInput'
 import { useCustomization } from '@/lib/customizationContext'
@@ -59,6 +59,9 @@ const modeLabels: Record<GameMode, string> = {
 export default function Game({ mode, onBack }: GameProps) {
   const [showResult, setShowResult] = useState(false)
   const [coinsEarned, setCoinsEarned] = useState(0)
+  // Player side selection - null means needs to be selected (when keybindings.playerSide === 'ask')
+  const [selectedSide, setSelectedSide] = useState<'p1' | 'p2' | null>(null)
+  const [showSideSelection, setShowSideSelection] = useState(false)
   
   // Get audio settings
   const { settings: audioSettings } = useAudio()
@@ -172,6 +175,20 @@ export default function Game({ mode, onBack }: GameProps) {
     console.log('Wavedash detected:', attempt.isClean ? 'Clean' : 'Sloppy')
   }, [])
 
+  // Initialize side selection based on keybindings
+  useEffect(() => {
+    if (keybindings.playerSide === 'ask') {
+      setSelectedSide(null)
+      setShowSideSelection(true)
+    } else {
+      setSelectedSide(keybindings.playerSide)
+      setShowSideSelection(false)
+    }
+  }, [keybindings.playerSide])
+
+  // Get the active side for the game (default to p1 if not selected yet)
+  const activeSide: 'p1' | 'p2' = selectedSide || 'p1'
+
   const {
     lastAttempt,
     lastWavedash,
@@ -179,7 +196,12 @@ export default function Game({ mode, onBack }: GameProps) {
     inputHistory,
     handleTouchInput,
     controllerConnected,
-  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash, keybindings)
+  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash, keybindings, activeSide)
+
+  const handleSelectSide = (side: 'p1' | 'p2') => {
+    setSelectedSide(side)
+    setShowSideSelection(false)
+  }
 
   const handleStart = () => {
     setShowResult(false)
@@ -250,6 +272,7 @@ export default function Game({ mode, onBack }: GameProps) {
           lastAttempt={state.lastAttempt || lastAttempt}
           currentStreak={state.currentStreak}
           customization={activeCustomization}
+          playerSide={activeSide}
         />
       </div>
 
@@ -266,7 +289,7 @@ export default function Game({ mode, onBack }: GameProps) {
 
       {/* Command History - scaled down on mobile */}
       <div className="absolute left-2 bottom-20 z-20 scale-75 origin-bottom-left lg:left-4 lg:bottom-4 lg:scale-100">
-        <CommandHistory inputs={inputHistory} lastAttempt={state.lastAttempt || lastAttempt} />
+        <CommandHistory inputs={inputHistory} lastAttempt={state.lastAttempt || lastAttempt} playerSide={activeSide} />
       </div>
 
       {/* Mobile Touch Controls */}
@@ -275,9 +298,81 @@ export default function Game({ mode, onBack }: GameProps) {
         onInputChange={handleTouchInput}
       />
 
+      {/* Side Selection Screen */}
+      <AnimatePresence>
+        {showSideSelection && !state.isPlaying && !showResult && (
+          <motion.div
+            className="absolute inset-0 z-35 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="text-center">
+              <motion.h2
+                className="font-display text-5xl text-white mb-4"
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+              >
+                SELECT SIDE
+              </motion.h2>
+              
+              <motion.p
+                className="text-gray-400 mb-8 font-sans max-w-md"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                Choose which side you want to play on. P2 side inverts your controls.
+              </motion.p>
+
+              <motion.div
+                className="flex gap-6 justify-center"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                <button
+                  className="group relative px-12 py-8 border-2 border-electric-blue rounded-lg hover:bg-electric-blue/20 transition-all"
+                  onClick={() => handleSelectSide('p1')}
+                >
+                  <div className="text-6xl mb-2">←</div>
+                  <div className="font-tekken text-2xl text-electric-blue tracking-wider">P1</div>
+                  <div className="text-gray-500 text-sm mt-2">Left Side</div>
+                  <div className="text-gray-600 text-xs mt-1">Forward = {getKeyDisplayName(keybindings.forward)}</div>
+                </button>
+                
+                <button
+                  className="group relative px-12 py-8 border-2 border-tekken-gold rounded-lg hover:bg-tekken-gold/20 transition-all"
+                  onClick={() => handleSelectSide('p2')}
+                >
+                  <div className="text-6xl mb-2">→</div>
+                  <div className="font-tekken text-2xl text-tekken-gold tracking-wider">P2</div>
+                  <div className="text-gray-500 text-sm mt-2">Right Side</div>
+                  <div className="text-gray-600 text-xs mt-1">Forward = {getKeyDisplayName(keybindings.backward)}</div>
+                </button>
+              </motion.div>
+
+              <motion.div
+                className="mt-8"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                <button
+                  className="text-gray-500 hover:text-white transition-colors font-tekken tracking-wider"
+                  onClick={handleQuit}
+                >
+                  ← BACK TO MENU
+                </button>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Start Screen */}
       <AnimatePresence>
-        {!state.isPlaying && !showResult && (
+        {!state.isPlaying && !showResult && !showSideSelection && (
           <motion.div
             className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
@@ -305,6 +400,21 @@ export default function Game({ mode, onBack }: GameProps) {
                 {mode === 'FREESTYLE' && 'Practice without pressure'}
               </motion.p>
 
+              {/* Show selected side indicator */}
+              <motion.div
+                className="mb-6 flex justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.25 }}
+              >
+                <div className={`
+                  px-4 py-2 rounded-full border-2 font-tekken text-sm tracking-wider
+                  ${activeSide === 'p1' ? 'border-electric-blue text-electric-blue' : 'border-tekken-gold text-tekken-gold'}
+                `}>
+                  {activeSide === 'p1' ? '← PLAYER 1 SIDE' : 'PLAYER 2 SIDE →'}
+                </div>
+              </motion.div>
+
               <motion.div
                 className="space-y-4"
                 initial={{ y: 20, opacity: 0 }}
@@ -317,6 +427,18 @@ export default function Game({ mode, onBack }: GameProps) {
                 >
                   START
                 </button>
+                
+                {/* Only show change side button if playerSide is 'ask' */}
+                {keybindings.playerSide === 'ask' && (
+                  <div>
+                    <button
+                      className="text-gray-400 hover:text-white transition-colors font-tekken tracking-wider text-sm"
+                      onClick={() => setShowSideSelection(true)}
+                    >
+                      CHANGE SIDE
+                    </button>
+                  </div>
+                )}
                 
                 <div>
                   <button

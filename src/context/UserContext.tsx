@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
+import { KeyBindings, UserSettings } from '@/types/game'
 
 export interface User {
   id: string
@@ -20,19 +21,8 @@ interface PlayerData {
     selectedElectricColor: string
     selectedCharacter: string
     selectedDummy: string
-    keybindings?: {
-      forward: string
-      down: string
-      punch: string
-    }
-    userSettings?: {
-      musicEnabled: boolean
-      sfxEnabled: boolean
-      musicVolume: number
-      sfxVolume: number
-      showFps: boolean
-      graphicsQuality: 'low' | 'medium' | 'high'
-    }
+    keybindings?: KeyBindings
+    userSettings?: UserSettings
   }
 }
 

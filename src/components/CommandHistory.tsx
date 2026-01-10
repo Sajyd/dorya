@@ -7,12 +7,23 @@ import { CommandInput, DoryaAttempt } from '@/types/game'
 interface CommandHistoryProps {
   inputs: CommandInput[]
   lastAttempt: DoryaAttempt | null
+  playerSide?: 'p1' | 'p2'
 }
 
-const directionSymbols: Record<string, string> = {
+// Direction symbols for P1 side (player on left, facing right)
+const directionSymbolsP1: Record<string, string> = {
   'f': '→',
   'd': '↓',
   'df': '↘',
+  'n': '○',
+}
+
+// Direction symbols for P2 side (player on right, facing left)
+// Forward becomes backward visually since player faces the other direction
+const directionSymbolsP2: Record<string, string> = {
+  'f': '←',
+  'd': '↓',
+  'df': '↙',
   'n': '○',
 }
 
@@ -24,10 +35,14 @@ const directionColors: Record<string, string> = {
 }
 
 const FRAME_MS = 1000 / 60 // ~16.67ms per frame
+const COUNTER_UPDATE_INTERVAL = 100 // Update live counter at 10fps instead of 60fps
 
-export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryProps) {
+export default function CommandHistory({ inputs, lastAttempt, playerSide = 'p1' }: CommandHistoryProps) {
   // Show last 8 inputs on desktop, 5 on mobile
   const displayInputs = inputs.slice(-8)
+  
+  // Use correct direction symbols based on player side
+  const directionSymbols = playerSide === 'p2' ? directionSymbolsP2 : directionSymbolsP1
   
   // Live frame counter for the current neutral state
   const [liveFrameCount, setLiveFrameCount] = useState(0)
@@ -57,6 +72,7 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
   const displayFrameCounts = frameCountsForInputs.slice(-8)
   
   // Live counter effect - ticks for the last input to show how long it's been held
+  // Reduced from 60fps to 10fps updates to prevent performance issues
   useEffect(() => {
     if (!lastInput) {
       setLiveFrameCount(1)
@@ -73,7 +89,7 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
     }
     
     updateCounter() // Initial update
-    const intervalId = setInterval(updateCounter, FRAME_MS)
+    const intervalId = setInterval(updateCounter, COUNTER_UPDATE_INTERVAL)
     
     return () => clearInterval(intervalId)
   }, [lastInput])
@@ -137,10 +153,10 @@ export default function CommandHistory({ inputs, lastAttempt }: CommandHistoryPr
       <div className="border-t border-gray-800 pt-2 md:pt-3">
         <div className="text-[10px] md:text-xs text-gray-600 mb-1 md:mb-2">EWGF NOTATION:</div>
         <div className="flex items-center gap-0.5 md:gap-1 text-xs md:text-sm">
-          <span className="text-electric-blue">→</span>
-          <span className="text-gray-500">○</span>
-          <span className="text-electric-purple">↓</span>
-          <span className="text-tekken-gold">↘+2</span>
+          <span className="text-electric-blue">{directionSymbols['f']}</span>
+          <span className="text-gray-500">{directionSymbols['n']}</span>
+          <span className="text-electric-purple">{directionSymbols['d']}</span>
+          <span className="text-tekken-gold">{directionSymbols['df']}+2</span>
         </div>
         <div className="text-[10px] md:text-xs text-gray-700 mt-0.5 md:mt-1">
           (f, n, d, df+2)

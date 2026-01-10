@@ -11,6 +11,7 @@ import {
   DEFAULT_KEYBINDINGS,
   UserSettings,
   DEFAULT_USER_SETTINGS,
+  PlayerSide,
 } from '@/types/game'
 import {
   STAGES,
@@ -66,6 +67,7 @@ interface CustomizationContextType {
   // Keybindings
   keybindings: KeyBindings
   updateKeybinding: (key: keyof KeyBindings, value: string) => Promise<void>
+  updatePlayerSide: (side: PlayerSide) => Promise<void>
   resetKeybindings: () => Promise<void>
   
   // User settings (audio/graphics)
@@ -90,9 +92,12 @@ interface CustomizationContextType {
 
 const CustomizationContext = createContext<CustomizationContextType | null>(null)
 
+// Default items that should always be available (free items)
+const DEFAULT_OWNED_ITEMS = ['stage_classic', 'electric_blue', 'char_mishima', 'dummy_classic']
+
 function getDefaultInventory(): PlayerInventory {
   return {
-    ownedItems: ['stage_classic', 'electric_blue', 'char_mishima', 'dummy_classic'],
+    ownedItems: [...DEFAULT_OWNED_ITEMS],
     selectedStage: 'stage_classic',
     selectedElectricColor: 'electric_blue',
     selectedCharacter: 'char_mishima',
@@ -100,6 +105,13 @@ function getDefaultInventory(): PlayerInventory {
     keybindings: { ...DEFAULT_KEYBINDINGS },
     userSettings: { ...DEFAULT_USER_SETTINGS },
   }
+}
+
+// Helper to ensure default items are always included in owned items
+function ensureDefaultItems(ownedItems: string[]): string[] {
+  const itemSet = new Set(ownedItems)
+  DEFAULT_OWNED_ITEMS.forEach(item => itemSet.add(item))
+  return Array.from(itemSet)
 }
 
 function getDefaultCurrency(): PlayerCurrency {
@@ -153,7 +165,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         premiumCoins: Math.max(0, pendingPlayerData.currency.premiumCoins),
       })
       setInventory({
-        ownedItems: pendingPlayerData.inventory.ownedItems,
+        // Ensure default/classic items are always included
+        ownedItems: ensureDefaultItems(pendingPlayerData.inventory.ownedItems || []),
         selectedStage: pendingPlayerData.inventory.selectedStage,
         selectedElectricColor: pendingPlayerData.inventory.selectedElectricColor,
         selectedCharacter: pendingPlayerData.inventory.selectedCharacter,
@@ -361,6 +374,16 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     await debouncedSync({ keybindings: newKeybindings })
   }, [inventory.keybindings, debouncedSync])
 
+  const updatePlayerSide = useCallback(async (side: PlayerSide) => {
+    setInventory(prev => ({
+      ...prev,
+      keybindings: { ...prev.keybindings, playerSide: side }
+    }))
+    
+    const newKeybindings = { ...inventory.keybindings, playerSide: side }
+    await debouncedSync({ keybindings: newKeybindings })
+  }, [inventory.keybindings, debouncedSync])
+
   const resetKeybindings = useCallback(async () => {
     setInventory(prev => ({
       ...prev,
@@ -509,7 +532,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
       premiumCoins: Math.max(0, data.currency.premiumCoins),
     })
     setInventory({
-      ownedItems: data.inventory.ownedItems,
+      // Ensure default/classic items are always included
+      ownedItems: ensureDefaultItems(data.inventory.ownedItems || []),
       selectedStage: data.inventory.selectedStage,
       selectedElectricColor: data.inventory.selectedElectricColor,
       selectedCharacter: data.inventory.selectedCharacter,
@@ -552,6 +576,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         selectDummy,
         keybindings: inventory.keybindings,
         updateKeybinding,
+        updatePlayerSide,
         resetKeybindings,
         userSettings: inventory.userSettings,
         updateUserSettings,

@@ -100,18 +100,25 @@ export interface PlayerCurrency {
   premiumCoins: number // Purchased with real money
 }
 
+// Player side selection
+export type PlayerSide = 'p1' | 'p2' | 'ask'
+
 // Key bindings for game controls
 export interface KeyBindings {
-  forward: string  // Key code for forward (default: 'KeyD')
-  down: string     // Key code for down (default: 'KeyS')
-  punch: string    // Key code for punch/2 button (default: 'KeyK')
+  forward: string   // Key code for forward (default: 'KeyD')
+  backward: string  // Key code for backward (default: 'KeyA')
+  down: string      // Key code for down (default: 'KeyS')
+  punch: string     // Key code for punch/2 button (default: 'KeyK')
+  playerSide: PlayerSide  // Default player side (default: 'ask')
 }
 
 // Default key bindings
 export const DEFAULT_KEYBINDINGS: KeyBindings = {
   forward: 'KeyD',
+  backward: 'KeyA',
   down: 'KeyS',
   punch: 'KeyK',
+  playerSide: 'ask',
 }
 
 // Graphics quality levels

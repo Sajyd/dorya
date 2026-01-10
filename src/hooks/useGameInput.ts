@@ -28,13 +28,19 @@ export function useGameInput(
   isPlaying: boolean,
   onDoryaAttempt: (attempt: DoryaAttempt) => void,
   onWavedash?: (attempt: WavedashAttempt) => void,
-  customKeybindings?: KeyBindings
+  customKeybindings?: KeyBindings,
+  playerSide: 'p1' | 'p2' = 'p1'
 ): UseGameInputReturn {
   // Memoize keybindings to prevent unnecessary re-renders
   const keybindings = useMemo(() => customKeybindings || DEFAULT_KEYBINDINGS, [customKeybindings])
   
-  // Generate valid keys set from keybindings
-  const validKeys = useMemo(() => new Set([keybindings.forward, keybindings.down, keybindings.punch]), [keybindings])
+  // On P2 side, forward and backward keys are swapped
+  // (pressing the backward key now means "forward" in game terms)
+  const effectiveForwardKey = playerSide === 'p2' ? keybindings.backward : keybindings.forward
+  const effectiveBackwardKey = playerSide === 'p2' ? keybindings.forward : keybindings.backward
+  
+  // Generate valid keys set from keybindings (include backward for P2 side validation)
+  const validKeys = useMemo(() => new Set([keybindings.forward, keybindings.backward, keybindings.down, keybindings.punch]), [keybindings])
   const [currentInputs, setCurrentInputs] = useState<CommandInput[]>([])
   const [lastAttempt, setLastAttempt] = useState<DoryaAttempt | null>(null)
   const [lastWavedash, setLastWavedash] = useState<WavedashAttempt | null>(null)
@@ -205,19 +211,25 @@ export function useGameInput(
     const WAVEDASH_WINDOW_FRAMES = 20
     
     if (hasNeutralBetween && !hasDownBetween) {
-      // f → n → df+2 pattern (PEWGF only)
-      // This pattern is ONLY valid as PEWGF (n must be exactly 1 frame)
-      // If n is held longer, it's a MISS - player should use f → n → d → df+2 for regular EWGF
+      // f → n → df+2 pattern
+      // PEWGF if neutral is exactly 1 frame
+      // Regular EWGF if neutral is 2-20 frames
+      // Miss if neutral is > 20 frames
       const nToDfFrames = dfPunchInput.frame - neutralInput!.frame
       frameDiff = nToDfFrames
       
       if (nToDfFrames === 1) {
         // True PEWGF: neutral held for exactly 1 frame
         result = 'perfect'
-      } else {
-        // f → n → df+2 with n held longer than 1 frame is invalid
-        // This is a MISS - not a valid EWGF pattern
+      } else if (nToDfFrames > WAVEDASH_WINDOW_FRAMES) {
+        // Outside wavedash window - not a valid EWGF
         return null
+      } else if (nToDfFrames <= 3) {
+        // Good EWGF - 2-3 frame neutral
+        result = 'good'
+      } else {
+        // Slow EWGF - 4-20 frame neutral - valid motion but slow timing
+        result = 'bad'
       }
     } else if (hasDownBetween && !hasNeutralBetween) {
       // f → d → df+2 pattern (PEWGF only, no neutral)
@@ -421,8 +433,9 @@ export function useGameInput(
 
   const processKeyState = useCallback((allKeys: Set<string>, changedKey?: string) => {
     // Check for directions using custom keybindings
+    // On P2 side, forward is the backward key (effectiveForwardKey)
     const isDown = allKeys.has(keybindings.down)
-    const isForward = allKeys.has(keybindings.forward)
+    const isForward = allKeys.has(effectiveForwardKey)
     const isPunch = changedKey === keybindings.punch && allKeys.has(keybindings.punch)
     
     // Determine current direction
@@ -447,7 +460,7 @@ export function useGameInput(
       processInput('n', 'none')
       lastProcessedDirectionRef.current = 'n'
     }
-  }, [processInput, keybindings])
+  }, [processInput, keybindings, effectiveForwardKey])
 
   // Combine all input sources (keyboard, touch, gamepad)
   const combineAllKeys = useCallback(() => {
@@ -495,8 +508,9 @@ export function useGameInput(
     const prevTouchKeys = new Set(touchKeysRef.current)
     
     // Map virtual touch keys to actual keybindings
+    // On P2 side, forward touch maps to effectiveForwardKey (backward key)
     const mappedTouchKeys = new Set<string>()
-    if (touchKeys.has('KeyD')) mappedTouchKeys.add(keybindings.forward)
+    if (touchKeys.has('KeyD')) mappedTouchKeys.add(effectiveForwardKey)
     if (touchKeys.has('KeyS')) mappedTouchKeys.add(keybindings.down)
     if (touchKeys.has('KeyK')) mappedTouchKeys.add(keybindings.punch)
     
@@ -522,16 +536,18 @@ export function useGameInput(
       touchFrameScheduledRef.current = true
       touchRafIdRef.current = requestAnimationFrame(processPendingTouchInput)
     }
-  }, [isPlaying, keybindings, processPendingTouchInput])
+  }, [isPlaying, keybindings, effectiveForwardKey, processPendingTouchInput])
   
   // Handle gamepad input
   // Note: Gamepad uses virtual keys internally, map to keybindings
+  // On P2 side, forward direction maps to effectiveForwardKey (backward key)
   const handleGamepadInput = useCallback((newGamepadKeys: Set<string>, punchJustPressed: boolean) => {
     if (!isPlaying) return
     
     // Map virtual gamepad keys to actual keybindings
+    // On P2 side, forward (KeyD) maps to effectiveForwardKey
     const mappedGamepadKeys = new Set<string>()
-    if (newGamepadKeys.has('KeyD')) mappedGamepadKeys.add(keybindings.forward)
+    if (newGamepadKeys.has('KeyD')) mappedGamepadKeys.add(effectiveForwardKey)
     if (newGamepadKeys.has('KeyS')) mappedGamepadKeys.add(keybindings.down)
     if (newGamepadKeys.has('KeyK')) mappedGamepadKeys.add(keybindings.punch)
     
@@ -545,7 +561,7 @@ export function useGameInput(
     const changedKey = punchJustPressed ? keybindings.punch : undefined
     
     processKeyState(allKeys, changedKey)
-  }, [isPlaying, processKeyState, combineAllKeys, keybindings])
+  }, [isPlaying, processKeyState, combineAllKeys, keybindings, effectiveForwardKey])
 
   // Gamepad connection handlers
   useEffect(() => {

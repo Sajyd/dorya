@@ -46,6 +46,7 @@ interface GameSceneProps {
   lastAttempt: DoryaAttempt | null
   currentStreak: number
   customization?: ActiveCustomization
+  playerSide?: 'p1' | 'p2'
 }
 
 // Electric lightning bolt geometry
@@ -65,7 +66,7 @@ function createLightningBolt(): THREE.BufferGeometry {
   return geometry
 }
 
-// Electric effect around the fist - enhanced with more dramatic sparks
+// Electric effect around the fist - optimized for performance
 function ElectricEffect({ 
   active, 
   isPerfect,
@@ -78,19 +79,41 @@ function ElectricEffect({
   position?: [number, number, number]
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const [bolts, setBolts] = useState<THREE.BufferGeometry[]>([])
-  const [isRainbow, setIsRainbow] = useState(false)
-  const [rainbowHue, setRainbowHue] = useState(0)
-  const [sparkParticles, setSparkParticles] = useState<Array<{pos: THREE.Vector3, vel: THREE.Vector3, life: number}>>([])
+  const boltsRef = useRef<THREE.Group>(null)
+  const sparksRef = useRef<THREE.Group>(null)
+  const coreGlowRef = useRef<THREE.Mesh>(null)
+  const outerGlowRef = useRef<THREE.Mesh>(null)
+  const extraGlowRef = useRef<THREE.Mesh>(null)
   
+  // Store bolt lines and spark meshes as refs to avoid re-creating
+  const boltLinesRef = useRef<THREE.Line[]>([])
+  const sparkMeshesRef = useRef<THREE.Mesh[]>([])
+  const sparkDataRef = useRef<Array<{pos: THREE.Vector3, vel: THREE.Vector3, life: number}>>([])
+  
+  const isRainbow = electricColor?.id === 'electric_rainbow'
+  
+  // Initialize bolts and sparks once
   useEffect(() => {
     if (active) {
-      // Generate lightning bolts
-      const newBolts = Array(12).fill(null).map(() => createLightningBolt())
-      setBolts(newBolts)
+      // Create bolt lines if not already created
+      if (boltLinesRef.current.length === 0) {
+        const material = new THREE.LineBasicMaterial({ 
+          color: '#ffffff', 
+          linewidth: 2, 
+          transparent: true, 
+          opacity: 0.9 
+        })
+        
+        for (let i = 0; i < 8; i++) {
+          const geometry = createLightningBolt()
+          const line = new THREE.Line(geometry, material.clone())
+          boltLinesRef.current.push(line)
+          boltsRef.current?.add(line)
+        }
+      }
       
-      // Generate spark particles
-      const newSparks = Array(20).fill(null).map(() => ({
+      // Initialize spark data
+      sparkDataRef.current = Array(12).fill(null).map(() => ({
         pos: new THREE.Vector3(
           (Math.random() - 0.5) * 0.3,
           (Math.random() - 0.5) * 0.3,
@@ -103,94 +126,138 @@ function ElectricEffect({
         ),
         life: 1
       }))
-      setSparkParticles(newSparks)
+      
+      // Create spark meshes if needed
+      if (sparkMeshesRef.current.length === 0) {
+        const sparkGeometry = new THREE.SphereGeometry(0.03, 6, 6)
+        const sparkMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true })
+        
+        for (let i = 0; i < 12; i++) {
+          const mesh = new THREE.Mesh(sparkGeometry, sparkMaterial.clone())
+          sparkMeshesRef.current.push(mesh)
+          sparksRef.current?.add(mesh)
+        }
+      }
+      
+      // Show bolts and sparks
+      boltLinesRef.current.forEach(line => { line.visible = true })
+      sparkMeshesRef.current.forEach(mesh => { mesh.visible = true })
     } else {
-      setBolts([])
-      setSparkParticles([])
+      // Hide bolts and sparks
+      boltLinesRef.current.forEach(line => { line.visible = false })
+      sparkMeshesRef.current.forEach(mesh => { mesh.visible = false })
+    }
+    
+    return () => {
+      // Cleanup on unmount
+      boltLinesRef.current.forEach(line => {
+        line.geometry.dispose()
+        ;(line.material as THREE.Material).dispose()
+      })
+      sparkMeshesRef.current.forEach(mesh => {
+        mesh.geometry.dispose()
+        ;(mesh.material as THREE.Material).dispose()
+      })
+      boltLinesRef.current = []
+      sparkMeshesRef.current = []
     }
   }, [active])
   
-  useEffect(() => {
-    setIsRainbow(electricColor?.id === 'electric_rainbow')
-  }, [electricColor])
-  
   useFrame((state, delta) => {
-    if (groupRef.current && active) {
-      // Rotate the electric effect
-      groupRef.current.rotation.y += 0.15
-      groupRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 25) * 0.15
-      
-      // Regenerate bolts for crackling effect
-      if (Math.random() < 0.15) {
-        setBolts(Array(12).fill(null).map(() => createLightningBolt()))
-      }
-      
-      // Update rainbow hue
-      if (isRainbow) {
-        setRainbowHue((state.clock.elapsedTime * 150) % 360)
-      }
-      
-      // Update spark particles
-      setSparkParticles(prev => prev.map(p => ({
-        ...p,
-        pos: p.pos.clone().add(p.vel.clone().multiplyScalar(delta)),
-        vel: p.vel.clone().add(new THREE.Vector3(0, -10 * delta, 0)),
-        life: p.life - delta * 2
-      })).filter(p => p.life > 0))
+    if (!active || !groupRef.current) return
+    
+    // Rotate the electric effect
+    groupRef.current.rotation.y += 0.15
+    groupRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 25) * 0.15
+    
+    // Calculate color
+    let color: THREE.Color
+    if (isPerfect) {
+      color = isRainbow 
+        ? new THREE.Color().setHSL((state.clock.elapsedTime * 0.4) % 1, 1, 0.6) 
+        : new THREE.Color(electricColor?.primaryColor || '#ffd700')
+    } else {
+      color = isRainbow 
+        ? new THREE.Color().setHSL((state.clock.elapsedTime * 0.4) % 1, 1, 0.5) 
+        : new THREE.Color(electricColor?.primaryColor || '#00d4ff')
     }
+    
+    const glowColor = electricColor?.secondaryColor ? new THREE.Color(electricColor.secondaryColor) : color
+    
+    // Update glow colors directly (no state change)
+    if (coreGlowRef.current) {
+      (coreGlowRef.current.material as THREE.MeshBasicMaterial).color = color
+    }
+    if (outerGlowRef.current) {
+      (outerGlowRef.current.material as THREE.MeshBasicMaterial).color = glowColor
+    }
+    if (extraGlowRef.current) {
+      (extraGlowRef.current.material as THREE.MeshBasicMaterial).color = color
+    }
+    
+    // Regenerate bolts occasionally (update geometry in place)
+    if (Math.random() < 0.1) {
+      boltLinesRef.current.forEach(line => {
+        const newGeometry = createLightningBolt()
+        line.geometry.dispose()
+        line.geometry = newGeometry
+        ;(line.material as THREE.LineBasicMaterial).color = color
+      })
+    }
+    
+    // Update spark particles (no state, direct mesh updates)
+    sparkDataRef.current.forEach((spark, i) => {
+      spark.pos.add(spark.vel.clone().multiplyScalar(delta))
+      spark.vel.y -= 10 * delta
+      spark.life -= delta * 2
+      
+      if (spark.life <= 0) {
+        // Reset particle
+        spark.pos.set(
+          (Math.random() - 0.5) * 0.3,
+          (Math.random() - 0.5) * 0.3,
+          (Math.random() - 0.5) * 0.3
+        )
+        spark.vel.set(
+          (Math.random() - 0.5) * 4,
+          Math.random() * 3 + 1,
+          (Math.random() - 0.5) * 4
+        )
+        spark.life = 1
+      }
+      
+      const mesh = sparkMeshesRef.current[i]
+      if (mesh) {
+        mesh.position.copy(spark.pos)
+        mesh.scale.setScalar(spark.life)
+        const mat = mesh.material as THREE.MeshBasicMaterial
+        mat.opacity = spark.life * 0.8
+        mat.color = color
+      }
+    })
   })
 
   if (!active) return null
 
-  // Determine color
-  let color: string
-  if (isPerfect) {
-    color = isRainbow ? `hsl(${rainbowHue}, 100%, 60%)` : (electricColor?.primaryColor || '#ffd700')
-  } else {
-    color = isRainbow ? `hsl(${rainbowHue}, 100%, 50%)` : (electricColor?.primaryColor || '#00d4ff')
-  }
-  
-  const glowColor = electricColor?.secondaryColor || color
-
   return (
     <group ref={groupRef} position={position}>
-      {bolts.map((geometry, i) => (
-        <primitive 
-          key={i} 
-          object={new THREE.Line(
-            geometry, 
-            new THREE.LineBasicMaterial({ 
-              color, 
-              linewidth: 2, 
-              transparent: true, 
-              opacity: 0.9 
-            })
-          )} 
-        />
-      ))}
+      <group ref={boltsRef} />
+      <group ref={sparksRef} />
       {/* Core glow */}
-      <mesh>
+      <mesh ref={coreGlowRef}>
         <sphereGeometry args={[0.25, 16, 16]} />
-        <meshBasicMaterial color={color} transparent opacity={0.6} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.6} />
       </mesh>
       {/* Outer glow */}
-      <mesh>
+      <mesh ref={outerGlowRef}>
         <sphereGeometry args={[0.45, 16, 16]} />
-        <meshBasicMaterial color={glowColor} transparent opacity={0.2} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.2} />
       </mesh>
       {/* Extra large outer glow for dramatic effect */}
-      <mesh>
+      <mesh ref={extraGlowRef}>
         <sphereGeometry args={[0.7, 16, 16]} />
-        <meshBasicMaterial color={color} transparent opacity={0.08} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.08} />
       </mesh>
-      
-      {/* Spark particles */}
-      {sparkParticles.map((spark, i) => (
-        <mesh key={`spark-${i}`} position={spark.pos.toArray()}>
-          <sphereGeometry args={[0.03 * spark.life, 6, 6]} />
-          <meshBasicMaterial color={color} transparent opacity={spark.life * 0.8} />
-        </mesh>
-      ))}
     </group>
   )
 }
@@ -201,6 +268,7 @@ function CharacterModel({
   isAttacking,
   isHit,
   side,
+  isPlayer = false,
   characterCustomization,
   dummyCustomization,
   electricColor,
@@ -213,6 +281,7 @@ function CharacterModel({
   isAttacking: boolean
   isHit: boolean
   side: 'left' | 'right'
+  isPlayer?: boolean
   characterCustomization?: CharacterItem
   dummyCustomization?: DummyItem
   electricColor?: ElectricColorItem
@@ -244,7 +313,7 @@ function CharacterModel({
 
   // Determine model path
   const isMirrorStyle = dummyCustomization?.style === 'shadow' || dummyCustomization?.style === 'hologram'
-  const modelPath = side === 'left' 
+  const modelPath = isPlayer 
     ? (characterCustomization?.modelPath || '/assets/models/characters/mishimaclassic.glb')
     : (isMirrorStyle 
         ? (characterCustomization?.modelPath || '/assets/models/characters/mishimaclassic.glb')
@@ -264,7 +333,7 @@ function CharacterModel({
         child.receiveShadow = true
         
         // Apply material modifications for special styles
-        if (side === 'right' && dummyCustomization) {
+        if (!isPlayer && dummyCustomization) {
           if (dummyCustomization.style === 'hologram') {
             child.material = (child.material as THREE.Material).clone()
             const mat = child.material as THREE.MeshStandardMaterial
@@ -287,7 +356,7 @@ function CharacterModel({
       }
       
       // Find right hand bone for electric effect attachment
-      if (side === 'left' && child instanceof THREE.Bone) {
+      if (isPlayer && child instanceof THREE.Bone) {
         const boneName = child.name.toLowerCase()
         // Log all bone names on first load for debugging
         if (!rightHandBoneRef.current) {
@@ -317,7 +386,7 @@ function CharacterModel({
       // Log available animations for debugging
       console.log(`[${side}] Available animations:`, animations.map(a => a.name))
       
-      if (side === 'left') {
+      if (isPlayer) {
         // Player character - find uppercut animation
         const uppercutClip = animations[0]
         
@@ -358,7 +427,7 @@ function CharacterModel({
 
   // Handle attack trigger - play uppercut animation
   useEffect(() => {
-    if (attackTriggered && side === 'left' && uppercutActionRef.current && mixerRef.current) {
+    if (attackTriggered && isPlayer && uppercutActionRef.current && mixerRef.current) {
       const action = uppercutActionRef.current
       
       console.log('Playing uppercut animation')
@@ -421,7 +490,7 @@ function CharacterModel({
 
   // Handle hit - launch the dummy or juggle if already in air
   useEffect(() => {
-    if (hitTriggered && hitTriggered > 0 && side === 'right') {
+    if (hitTriggered && hitTriggered > 0 && !isPlayer) {
       const anim = animationState.current
       
       if (anim.isLaunching && anim.launchHeight > 0) {
@@ -449,7 +518,7 @@ function CharacterModel({
   // Classic opponent model has a different origin point and needs a higher offset
   // Shadow/hologram use character models which also need no offset (same as combat robot)
   const isClassicOpponentModel = dummyCustomization?.style === 'classic'
-  const yOffset = side === 'right' ? (isClassicOpponentModel ? 1.5 : 0) : 0
+  const yOffset = !isPlayer ? (isClassicOpponentModel ? 1.5 : 0) : 0
 
   useFrame((state, delta) => {
     // Update animation mixer
@@ -458,7 +527,7 @@ function CharacterModel({
     }
     
     // Track right hand bone position for electric effect
-    if (side === 'left' && rightHandBoneRef.current && showElectric) {
+    if (isPlayer && rightHandBoneRef.current && showElectric) {
       const worldPos = new THREE.Vector3()
       rightHandBoneRef.current.getWorldPosition(worldPos)
       
@@ -474,7 +543,7 @@ function CharacterModel({
     
     const anim = animationState.current
     
-    if (side === 'right') {
+    if (!isPlayer) {
       // DUMMY/OPPONENT - handle launch physics
       const baseY = position[1] + yOffset // Account for ground offset
       
@@ -564,8 +633,8 @@ function CharacterModel({
     }
   })
 
-  const glowColor = side === 'left' ? characterCustomization?.glowColor : undefined
-  const isDummyHologram = side === 'right' && dummyCustomization?.style === 'hologram'
+  const glowColor = isPlayer ? characterCustomization?.glowColor : undefined
+  const isDummyHologram = !isPlayer && dummyCustomization?.style === 'hologram'
   
   const faceRotation = side === 'left' 
     ? Math.PI * 0.5 
@@ -584,7 +653,7 @@ function CharacterModel({
       rotation={[0, faceRotation, 0]}
     >
       {/* Character glow effect */}
-      {glowColor && side === 'left' && (
+      {glowColor && isPlayer && (
         <pointLight position={[0, 1.5, 0]} intensity={0.8} color={glowColor} distance={4} />
       )}
       
@@ -599,7 +668,7 @@ function CharacterModel({
       </group>
         
       {/* Electric effect at fist position */}
-      {side === 'left' && showElectric && (
+      {isPlayer && showElectric && (
         <ElectricEffect 
           active={true} 
           isPerfect={isPerfect || false}
@@ -611,20 +680,48 @@ function CharacterModel({
   )
 }
 
-// Impact spark effect - enhanced
+// Impact spark effect - optimized for performance
 function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean; position: [number, number, number]; color?: string }) {
   const groupRef = useRef<THREE.Group>(null)
-  const [particles, setParticles] = useState<Array<{
+  const meshesRef = useRef<THREE.Mesh[]>([])
+  const particleDataRef = useRef<Array<{
     position: THREE.Vector3
     velocity: THREE.Vector3
     scale: number
     life: number
   }>>([])
+  const isActiveRef = useRef(false)
+  const particleCount = 15
 
+  // Initialize particle meshes once
   useEffect(() => {
-    if (active) {
-      // Create explosion particles
-      const newParticles = Array(25).fill(null).map(() => ({
+    if (groupRef.current && meshesRef.current.length === 0) {
+      const geometry = new THREE.BoxGeometry(1, 1, 1)
+      const material = new THREE.MeshBasicMaterial({ color, transparent: true })
+      
+      for (let i = 0; i < particleCount; i++) {
+        const mesh = new THREE.Mesh(geometry, material.clone())
+        mesh.visible = false
+        meshesRef.current.push(mesh)
+        groupRef.current.add(mesh)
+      }
+    }
+    
+    return () => {
+      meshesRef.current.forEach(mesh => {
+        mesh.geometry.dispose()
+        ;(mesh.material as THREE.Material).dispose()
+      })
+      meshesRef.current = []
+    }
+  }, [color])
+
+  // Reset particles when becoming active
+  useEffect(() => {
+    if (active && !isActiveRef.current) {
+      isActiveRef.current = true
+      
+      particleDataRef.current = Array(particleCount).fill(null).map(() => ({
         position: new THREE.Vector3(
           (Math.random() - 0.5) * 0.3,
           (Math.random() - 0.5) * 0.3,
@@ -638,36 +735,50 @@ function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean
         scale: 0.08 + Math.random() * 0.15,
         life: 1,
       }))
-      setParticles(newParticles)
+      
+      meshesRef.current.forEach(mesh => { mesh.visible = true })
+    } else if (!active) {
+      isActiveRef.current = false
     }
   }, [active])
 
   useFrame((state, delta) => {
-    if (particles.length > 0) {
-      setParticles(prev => 
-        prev.map(p => ({
-          ...p,
-          position: p.position.clone().add(p.velocity.clone().multiplyScalar(delta)),
-          velocity: p.velocity.clone().add(new THREE.Vector3(0, -12 * delta, 0)),
-          scale: p.scale * 0.96,
-          life: p.life - delta * 1.5,
-        })).filter(p => p.life > 0 && p.scale > 0.01)
-      )
+    if (!isActiveRef.current) return
+    
+    let anyVisible = false
+    
+    particleDataRef.current.forEach((p, i) => {
+      if (p.life <= 0 || p.scale <= 0.01) {
+        if (meshesRef.current[i]) {
+          meshesRef.current[i].visible = false
+        }
+        return
+      }
+      
+      anyVisible = true
+      
+      // Update particle physics
+      p.position.add(p.velocity.clone().multiplyScalar(delta))
+      p.velocity.y -= 12 * delta
+      p.scale *= 0.96
+      p.life -= delta * 1.5
+      
+      // Update mesh directly
+      const mesh = meshesRef.current[i]
+      if (mesh) {
+        mesh.position.copy(p.position)
+        mesh.scale.setScalar(p.scale)
+        ;(mesh.material as THREE.MeshBasicMaterial).opacity = p.life * 0.9
+      }
+    })
+    
+    if (!anyVisible) {
+      isActiveRef.current = false
+      meshesRef.current.forEach(mesh => { mesh.visible = false })
     }
   })
 
-  if (!active && particles.length === 0) return null
-
-  return (
-    <group ref={groupRef} position={position}>
-      {particles.map((particle, i) => (
-        <mesh key={i} position={particle.position.toArray()}>
-          <boxGeometry args={[particle.scale, particle.scale, particle.scale]} />
-          <meshBasicMaterial color={color} transparent opacity={particle.life * 0.9} />
-        </mesh>
-      ))}
-    </group>
-  )
+  return <group ref={groupRef} position={position} />
 }
 
 // Arena floor with grid
@@ -749,7 +860,7 @@ function ModelLoadingFallback({ position }: { position: [number, number, number]
 }
 
 // Main scene component
-function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySettings }: GameSceneProps & { qualitySettings?: typeof QUALITY_SETTINGS['high'] }) {
+function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySettings, playerSide = 'p1' }: GameSceneProps & { qualitySettings?: typeof QUALITY_SETTINGS['high'] }) {
   const [isAttacking, setIsAttacking] = useState(false)
   const [isHit, setIsHit] = useState(false)
   const [showImpact, setShowImpact] = useState(false)
@@ -764,6 +875,10 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
   const electricColor = customization?.electricColor || ELECTRIC_COLORS[0]
   const character = customization?.character || CHARACTERS[0]
   const dummy = customization?.dummy || DUMMIES[0]
+  
+  // Swap positions based on player side (P2 = player on right, opponent on left)
+  const playerX = playerSide === 'p1' ? -1.8 : 1.8
+  const opponentX = playerSide === 'p1' ? 1.8 : -1.8
   
   // Handle attempt results - trigger animation on ANY attempt including misses
   useEffect(() => {
@@ -835,13 +950,14 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
       
       <Arena stageCustomization={stage} />
       
-      {/* Player character (left) */}
-      <Suspense fallback={<ModelLoadingFallback position={[-1.8, 0, 0]} />}>
+      {/* Player character */}
+      <Suspense fallback={<ModelLoadingFallback position={[playerX, 0, 0]} />}>
         <CharacterModel 
-          position={[-1.8, 0, 0]} 
+          position={[playerX, 0, 0]} 
           isAttacking={isAttacking}
           isHit={false}
-          side="left"
+          side={playerSide === 'p1' ? 'left' : 'right'}
+          isPlayer={true}
           characterCustomization={character}
           electricColor={electricColor}
           isPerfect={isPerfect}
@@ -850,14 +966,15 @@ function Scene({ isPlaying, lastAttempt, currentStreak, customization, qualitySe
         />
       </Suspense>
       
-      {/* Opponent character (right) */}
-      <Suspense fallback={<ModelLoadingFallback position={[1.8, 0, 0]} />}>
+      {/* Opponent character */}
+      <Suspense fallback={<ModelLoadingFallback position={[opponentX, 0, 0]} />}>
         <CharacterModel 
-          position={[1.8, 0, 0]} 
+          position={[opponentX, 0, 0]} 
           isAttacking={false}
           isHit={isHit}
           hitTriggered={hitTrigger}
-          side="right"
+          side={playerSide === 'p1' ? 'right' : 'left'}
+          isPlayer={false}
           characterCustomization={character}
           dummyCustomization={dummy}
         />
@@ -924,7 +1041,7 @@ export default function GameScene(props: GameSceneProps) {
     >
       <FPSLimiter />
       <Suspense fallback={null}>
-        <Scene {...props} qualitySettings={qualitySettings} />
+        <Scene {...props} qualitySettings={qualitySettings} playerSide={props.playerSide} />
         
         {/* Post-processing effects - disabled on low quality */}
         {qualitySettings.enableBloom && (

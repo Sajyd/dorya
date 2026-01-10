@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/context/UserContext'
 import { useCustomization } from '@/lib/customizationContext'
 import { useAudio, GraphicsQuality } from '@/context/AudioContext'
-import { KeyBindings, DEFAULT_KEYBINDINGS } from '@/types/game'
+import { KeyBindings, DEFAULT_KEYBINDINGS, PlayerSide } from '@/types/game'
 
 interface SettingsProps {
   onBack: () => void
@@ -58,7 +58,7 @@ function getKeyDisplayName(keyCode: string): string {
 
 export default function Settings({ onBack }: SettingsProps) {
   const { user, isLoggedIn, updateGuestUsername, login, signup, logout } = useUser()
-  const { syncFromServer, keybindings, updateKeybinding, resetKeybindings } = useCustomization()
+  const { syncFromServer, keybindings, updateKeybinding, updatePlayerSide, resetKeybindings } = useCustomization()
   const { settings: audioSettings, setMusicEnabled, setSfxEnabled, setMusicVolume, setSfxVolume, setShowFps, setGraphicsQuality } = useAudio()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   
@@ -477,6 +477,26 @@ export default function Settings({ onBack }: SettingsProps) {
                       {listeningFor === 'punch' ? '...' : getKeyDisplayName(keybindings.punch)}
                     </button>
                   </div>
+
+                  {/* Backward */}
+                  <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                    <div>
+                      <span className="font-tekken text-sm text-tekken-gold tracking-wider">BACKWARD</span>
+                      <p className="text-gray-500 text-xs font-sans mt-1">Move backward (P2 side forward)</p>
+                    </div>
+                    <button
+                      onClick={() => setListeningFor('backward')}
+                      className={`
+                        px-6 py-3 min-w-[100px] font-tekken text-lg tracking-wider rounded transition-all
+                        ${listeningFor === 'backward'
+                          ? 'bg-electric-blue/30 border-2 border-electric-blue text-electric-blue animate-pulse'
+                          : 'bg-gray-800 border-2 border-gray-600 text-white hover:border-tekken-gold'
+                        }
+                      `}
+                    >
+                      {listeningFor === 'backward' ? '...' : getKeyDisplayName(keybindings.backward)}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Saved message */}
@@ -490,10 +510,42 @@ export default function Settings({ onBack }: SettingsProps) {
                   </motion.p>
                 )}
 
+                {/* Player Side Selection */}
+                <div className="border-t border-gray-700 pt-6 mt-2">
+                  <h3 className="font-tekken text-sm text-electric-blue tracking-wider mb-4">
+                    DEFAULT PLAYER SIDE
+                  </h3>
+                  <p className="text-gray-500 text-xs font-sans mb-4">
+                    Choose which side you play on. P2 side inverts controls (forward becomes backward key).
+                  </p>
+                  <div className="flex gap-2">
+                    {(['p1', 'p2', 'ask'] as PlayerSide[]).map((side) => (
+                      <button
+                        key={side}
+                        onClick={() => updatePlayerSide(side)}
+                        className={`flex-1 px-4 py-3 font-tekken text-sm tracking-wider rounded transition-all duration-200 border-2 ${
+                          keybindings.playerSide === side
+                            ? 'border-tekken-gold bg-tekken-gold/20 text-tekken-gold'
+                            : 'border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        {side === 'p1' ? 'PLAYER 1' : side === 'p2' ? 'PLAYER 2' : 'ASK'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-gray-600 text-xs font-sans mt-2">
+                    {keybindings.playerSide === 'ask' 
+                      ? "You'll choose your side at the start of each game."
+                      : keybindings.playerSide === 'p1'
+                        ? "You're on the left side. Forward = toward opponent."
+                        : "You're on the right side. Forward = backward key."}
+                  </p>
+                </div>
+
                 {/* Reset button */}
                 <button
                   onClick={handleResetKeybindings}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 text-gray-400 font-tekken tracking-wider rounded hover:bg-gray-700/50 hover:text-white transition-all"
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 text-gray-400 font-tekken tracking-wider rounded hover:bg-gray-700/50 hover:text-white transition-all mt-6"
                 >
                   RESET TO DEFAULTS
                 </button>
@@ -502,7 +554,7 @@ export default function Settings({ onBack }: SettingsProps) {
                 <div className="mt-6 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
                   <p className="text-gray-500 text-xs font-sans">
                     <span className="text-gray-400 font-tekken">DEFAULT KEYS:</span>{' '}
-                    D (Forward), S (Down), K (Punch)
+                    D (Forward), A (Backward), S (Down), K (Punch)
                   </p>
                   <p className="text-gray-600 text-xs font-sans mt-2">
                     Your keybindings are saved to your account and sync across devices.

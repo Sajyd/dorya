@@ -49,11 +49,16 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
     openCrate,
   } = useCustomization()
 
-  const handleBuyCrate = (crateType: CrateType) => {
+  const handleBuyCrate = async (crateType: CrateType) => {
     const crate = LOOT_CRATES.find(c => c.id === crateType)
     if (!crate || currency.doryaCoins < crate.price) return
     
-    setOpeningCrate(crateType)
+    // Roll items FIRST, then start the animation with items
+    const results = await openCrate(crateType)
+    if (results) {
+      setCrateResults(results)
+      setOpeningCrate(crateType)
+    }
   }
 
   const handleBuyCrateWithStripe = async (crateType: CrateType) => {
@@ -93,11 +98,15 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
     }
   }
 
-  const handleCrateAnimationComplete = async () => {
-    if (openingCrate) {
-      const results = await openCrate(openingCrate)
-      setCrateResults(results)
-    }
+  const handleCrateAnimationComplete = () => {
+    // Animation complete - items were already rolled in handleBuyCrate
+    // This is called when the animation finishes (for cases without items)
+  }
+
+  const handleClaimRewards = () => {
+    // Rewards already added to inventory when openCrate was called
+    setOpeningCrate(null)
+    setCrateResults(null)
   }
 
   const handleCloseCrateResults = () => {
@@ -386,97 +395,15 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
         </div>
       </div>
       
-      {/* Loot Crate Opening Animation */}
+      {/* Loot Crate Opening Animation - now with integrated item reveal */}
       <AnimatePresence>
-        {openingCrate && !crateResults && (
+        {openingCrate && (
           <LootCrateOpening
             crateType={openingCrate}
             onComplete={handleCrateAnimationComplete}
+            items={crateResults || undefined}
+            onClaim={handleClaimRewards}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Crate Results */}
-      <AnimatePresence>
-        {crateResults && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleCloseCrateResults}
-          >
-            <motion.div
-              className="text-center w-full max-w-2xl"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: 'spring' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="font-display text-2xl md:text-4xl text-tekken-gold mb-4 md:mb-8">YOU RECEIVED!</h2>
-              
-              <div className="flex flex-wrap justify-center gap-2 md:gap-4">
-                {crateResults.map((item, index) => (
-                  <motion.div
-                    key={index}
-                    className="relative w-28 md:w-40 p-2 md:p-4 rounded-xl border-2 bg-gray-900/80"
-                    style={{
-                      borderColor: item.isNew ? RARITY_COLORS[item.rarity] : '#6b7280',
-                      boxShadow: item.isNew 
-                        ? `0 0 30px ${RARITY_GLOW[item.rarity]}` 
-                        : '0 0 15px rgba(107, 114, 128, 0.3)',
-                    }}
-                    initial={{ opacity: 0, y: 50, rotateY: 180 }}
-                    animate={{ opacity: 1, y: 0, rotateY: 0 }}
-                    transition={{ delay: 0.3 + index * 0.2, type: 'spring' }}
-                  >
-                    {/* New badge */}
-                    {item.isNew && (
-                      <motion.div
-                        className="absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 px-1.5 md:px-2 py-0.5 rounded-full bg-green-500 text-[8px] md:text-xs font-tekken text-white z-10"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.5 + index * 0.2, type: 'spring' }}
-                      >
-                        NEW!
-                      </motion.div>
-                    )}
-                    {/* Duplicate badge */}
-                    {!item.isNew && (
-                      <motion.div
-                        className="absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 px-1.5 md:px-2 py-0.5 rounded-full bg-gray-600 text-[8px] md:text-xs font-tekken text-gray-300 z-10"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.5 + index * 0.2, type: 'spring' }}
-                      >
-                        OWNED
-                      </motion.div>
-                    )}
-                    <div className="aspect-square mb-1 md:mb-2 rounded-lg bg-black/50 flex items-center justify-center">
-                      <ItemPreview item={item} />
-                    </div>
-                    <p
-                      className="font-tekken text-[10px] md:text-xs uppercase"
-                      style={{ color: item.isNew ? RARITY_COLORS[item.rarity] : '#6b7280' }}
-                    >
-                      {item.rarity}
-                    </p>
-                    <p className={`text-xs md:text-sm truncate ${item.isNew ? 'text-white' : 'text-gray-400'}`}>{item.name}</p>
-                  </motion.div>
-                ))}
-              </div>
-
-              <motion.button
-                className="mt-4 md:mt-8 menu-button"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 + crateResults.length * 0.2 }}
-                onClick={handleCloseCrateResults}
-              >
-                AWESOME!
-              </motion.button>
-            </motion.div>
-          </motion.div>
         )}
       </AnimatePresence>
 
