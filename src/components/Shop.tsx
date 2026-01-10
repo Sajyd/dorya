@@ -63,7 +63,7 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
 
   const handleBuyCrateWithStripe = async (crateType: CrateType) => {
     // Require authenticated (non-guest) login for real money purchases
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !user) {
       setPurchaseError('You must sign up or log in to purchase with real money. This ensures your items are saved to your account.')
       setShowPremiumModal(true)
       return
