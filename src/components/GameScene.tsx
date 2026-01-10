@@ -149,17 +149,20 @@ function ElectricEffect({
     }
     
     return () => {
-      // Cleanup on unmount
+      // Cleanup on unmount - remove from parent groups first, then dispose
       boltLinesRef.current.forEach(line => {
+        boltsRef.current?.remove(line)
         line.geometry.dispose()
         ;(line.material as THREE.Material).dispose()
       })
       sparkMeshesRef.current.forEach(mesh => {
+        sparksRef.current?.remove(mesh)
         mesh.geometry.dispose()
         ;(mesh.material as THREE.Material).dispose()
       })
       boltLinesRef.current = []
       sparkMeshesRef.current = []
+      sparkDataRef.current = []
     }
   }, [active])
   
@@ -692,8 +695,9 @@ function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean
   }>>([])
   const isActiveRef = useRef(false)
   const particleCount = 15
+  const currentColorRef = useRef(color)
 
-  // Initialize particle meshes once
+  // Initialize particle meshes once on mount, update color without recreating
   useEffect(() => {
     if (groupRef.current && meshesRef.current.length === 0) {
       const geometry = new THREE.BoxGeometry(1, 1, 1)
@@ -708,12 +712,23 @@ function ImpactEffect({ active, position, color = '#ffd700' }: { active: boolean
     }
     
     return () => {
+      // Proper cleanup: remove from parent, then dispose
       meshesRef.current.forEach(mesh => {
+        groupRef.current?.remove(mesh)
         mesh.geometry.dispose()
         ;(mesh.material as THREE.Material).dispose()
       })
       meshesRef.current = []
+      particleDataRef.current = []
     }
+  }, []) // Only run on mount/unmount, not on color change
+
+  // Update particle colors when color prop changes (without recreating meshes)
+  useEffect(() => {
+    currentColorRef.current = color
+    meshesRef.current.forEach(mesh => {
+      ;(mesh.material as THREE.MeshBasicMaterial).color.set(color)
+    })
   }, [color])
 
   // Reset particles when becoming active

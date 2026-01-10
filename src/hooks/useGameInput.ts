@@ -7,6 +7,7 @@ import { CommandInput, DoryaAttempt, WavedashAttempt, InputDirection, InputButto
 // https://w3c.github.io/gamepad/#remapping
 const GAMEPAD_PUNCH_BUTTONS = [0, 1, 2, 3] // A/B/X/Y or Cross/Circle/Square/Triangle
 const GAMEPAD_DPAD_DOWN = 13
+const GAMEPAD_DPAD_LEFT = 14
 const GAMEPAD_DPAD_RIGHT = 15
 const GAMEPAD_STICK_THRESHOLD = 0.5 // Threshold for analog stick activation
 
@@ -544,10 +545,20 @@ export function useGameInput(
   const handleGamepadInput = useCallback((newGamepadKeys: Set<string>, punchJustPressed: boolean) => {
     if (!isPlaying) return
     
-    // Map virtual gamepad keys to actual keybindings
-    // On P2 side, forward (KeyD) maps to effectiveForwardKey
+    // Map virtual gamepad keys to actual keybindings based on player side
+    // KeyD = physical right, KeyA = physical left
+    // P1: right (KeyD) = forward, left (KeyA) = backward
+    // P2: left (KeyA) = forward, right (KeyD) = backward
     const mappedGamepadKeys = new Set<string>()
-    if (newGamepadKeys.has('KeyD')) mappedGamepadKeys.add(effectiveForwardKey)
+    if (playerSide === 'p1') {
+      // P1: KeyD (right/→) is forward
+      if (newGamepadKeys.has('KeyD')) mappedGamepadKeys.add(effectiveForwardKey)
+      if (newGamepadKeys.has('KeyA')) mappedGamepadKeys.add(effectiveBackwardKey)
+    } else {
+      // P2: KeyA (left/←) is forward
+      if (newGamepadKeys.has('KeyA')) mappedGamepadKeys.add(effectiveForwardKey)
+      if (newGamepadKeys.has('KeyD')) mappedGamepadKeys.add(effectiveBackwardKey)
+    }
     if (newGamepadKeys.has('KeyS')) mappedGamepadKeys.add(keybindings.down)
     if (newGamepadKeys.has('KeyK')) mappedGamepadKeys.add(keybindings.punch)
     
@@ -561,7 +572,7 @@ export function useGameInput(
     const changedKey = punchJustPressed ? keybindings.punch : undefined
     
     processKeyState(allKeys, changedKey)
-  }, [isPlaying, processKeyState, combineAllKeys, keybindings, effectiveForwardKey])
+  }, [isPlaying, processKeyState, combineAllKeys, keybindings, effectiveForwardKey, effectiveBackwardKey, playerSide])
 
   // Gamepad connection handlers
   useEffect(() => {
@@ -625,15 +636,21 @@ export function useGameInput(
       if (gamepad.buttons[GAMEPAD_DPAD_DOWN]?.pressed) {
         newKeys.add('KeyS') // Down
       }
+      if (gamepad.buttons[GAMEPAD_DPAD_LEFT]?.pressed) {
+        newKeys.add('KeyA') // Left (backward on P1, forward on P2)
+      }
       if (gamepad.buttons[GAMEPAD_DPAD_RIGHT]?.pressed) {
-        newKeys.add('KeyD') // Forward
+        newKeys.add('KeyD') // Right (forward on P1, backward on P2)
       }
       
       // Check left analog stick for directions
       // Stick X: negative = left, positive = right
       // Stick Y: negative = up, positive = down
+      if (gamepad.axes[0] < -GAMEPAD_STICK_THRESHOLD) {
+        newKeys.add('KeyA') // Left
+      }
       if (gamepad.axes[0] > GAMEPAD_STICK_THRESHOLD) {
-        newKeys.add('KeyD') // Forward (right)
+        newKeys.add('KeyD') // Right
       }
       if (gamepad.axes[1] > GAMEPAD_STICK_THRESHOLD) {
         newKeys.add('KeyS') // Down

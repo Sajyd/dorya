@@ -298,7 +298,6 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
               : 'border-gray-700 bg-black/50 text-gray-600'}
           `}>
             <span>{getKeyDisplayName(keybindings.backward || 'KeyA')}</span>
-            {playerSide === 'p2' && <span className="text-[8px] opacity-70">FWD</span>}
           </div>
           <div className={`
             w-10 h-10 rounded border-2 flex items-center justify-center font-mono text-sm
@@ -318,7 +317,6 @@ export default function GameHUD({ mode, state, activeKeys, onPause, onBack, cont
               : 'border-gray-700 bg-black/50 text-gray-600'}
           `}>
             <span>{getKeyDisplayName(keybindings.forward)}</span>
-            {playerSide === 'p1' && <span className="text-[8px] opacity-70">FWD</span>}
           </div>
         </div>
 
