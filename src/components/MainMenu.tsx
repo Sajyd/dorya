@@ -415,13 +415,25 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
 
       {/* Footer - Bottom left on mobile/landscape, centered on desktop */}
       <motion.div 
-        className="absolute bottom-2 left-3 landscape:bottom-2 landscape:left-3 md:landscape:bottom-8 md:landscape:left-1/2 md:landscape:-translate-x-1/2 md:bottom-8 md:left-1/2 md:-translate-x-1/2 text-left landscape:text-left md:landscape:text-center md:text-center text-gray-600 font-tekken text-[9px] landscape:text-[8px] md:landscape:text-sm md:text-sm tracking-widest z-10"
+        className="absolute z-10 text-gray-600 font-tekken tracking-widest"
+        style={isMobile ? {
+          bottom: '0.5rem',
+          left: '0.75rem',
+          textAlign: 'left',
+          fontSize: '8px',
+        } : {
+          bottom: '2rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          textAlign: 'center',
+          fontSize: '0.875rem',
+        }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1 }}
       >
         <p>PRESS F, N, D, DF+2 FOR ELECTRIC</p>
-        <p className="mt-0.5 md:mt-1 text-[7px] landscape:text-[6px] md:landscape:text-xs md:text-xs">INSPIRED BY TEKKEN</p>
+        <p style={{ marginTop: isMobile ? '2px' : '4px', fontSize: isMobile ? '6px' : '0.75rem' }}>INSPIRED BY TEKKEN</p>
       </motion.div>
 
       <style jsx>{`
