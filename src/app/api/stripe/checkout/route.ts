@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { stripe, CRATE_AMOUNTS } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { LOOT_CRATES } from '@/lib/customizationData'
 import { CrateType } from '@/types/game'
+
+const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +18,17 @@ export async function POST(request: Request) {
       )
     }
 
+    // Verify user is authenticated (not a guest) to prevent losing purchases
+    const cookieStore = await cookies()
+    const authToken = cookieStore.get(AUTH_TOKEN_COOKIE)?.value
+    
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'You must be logged in to make purchases. Please sign up or log in to continue.' },
+        { status: 401 }
+      )
+    }
+
     const crate = LOOT_CRATES.find(c => c.id === crateType)
     if (!crate) {
       return NextResponse.json(
@@ -23,23 +37,24 @@ export async function POST(request: Request) {
       )
     }
 
-    // Find or create player
-    let player = await prisma.player.findUnique({
-      where: { username: username.toUpperCase() },
+    // Find authenticated player by auth token
+    const player = await prisma.player.findUnique({
+      where: { authToken },
     })
 
-    if (!player) {
-      player = await prisma.player.create({
-        data: {
-          username: username.toUpperCase(),
-          doryaCoins: 500,
-          inventory: {
-            create: {
-              ownedItems: JSON.stringify(['stage_classic', 'electric_blue', 'char_mishima', 'dummy_classic']),
-            },
-          },
-        },
-      })
+    // Verify player exists, has a password (authenticated), and username matches
+    if (!player || !player.passwordHash) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign up or log in.' },
+        { status: 401 }
+      )
+    }
+
+    if (player.username !== username.toUpperCase()) {
+      return NextResponse.json(
+        { error: 'Username mismatch. Please refresh and try again.' },
+        { status: 403 }
+      )
     }
 
     const amount = CRATE_AMOUNTS[crateType as keyof typeof CRATE_AMOUNTS]

@@ -40,7 +40,7 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null)
   const [purchasingCrate, setPurchasingCrate] = useState<CrateType | null>(null)
   const [purchaseError, setPurchaseError] = useState<string | null>(null)
-  const { user } = useUser()
+  const { user, isLoggedIn } = useUser()
 
   const {
     currency,
@@ -62,8 +62,9 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
   }
 
   const handleBuyCrateWithStripe = async (crateType: CrateType) => {
-    if (!user?.username) {
-      setPurchaseError('Please log in to purchase crates')
+    // Require authenticated (non-guest) login for real money purchases
+    if (!isLoggedIn) {
+      setPurchaseError('You must sign up or log in to purchase with real money. This ensures your items are saved to your account.')
       setShowPremiumModal(true)
       return
     }
@@ -289,15 +290,18 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
                           <span>{crate.price.toLocaleString()}</span>
                         </button>
                         
-                        {/* Buy with Real Money (Stripe) */}
+                        {/* Buy with Real Money (Stripe) - requires login */}
                         <button
                           className={`w-full py-1.5 md:py-2 px-3 md:px-4 rounded-lg font-tekken tracking-wider text-xs md:text-sm border transition-all flex items-center justify-center gap-2 ${
                             purchasingCrate === crate.id
                               ? 'bg-purple-900/50 text-purple-400 border-purple-700 cursor-wait'
-                              : 'bg-purple-900/50 text-purple-400 border-purple-700 hover:bg-purple-900'
+                              : !isLoggedIn
+                                ? 'bg-gray-800/50 text-gray-500 border-gray-700 cursor-not-allowed'
+                                : 'bg-purple-900/50 text-purple-400 border-purple-700 hover:bg-purple-900'
                           }`}
                           onClick={() => handleBuyCrateWithStripe(crate.id)}
                           disabled={purchasingCrate === crate.id}
+                          title={!isLoggedIn ? 'Sign up or log in to purchase with real money' : undefined}
                         >
                           {purchasingCrate === crate.id ? (
                             <>
@@ -307,6 +311,11 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
                                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                               />
                               <span>PROCESSING...</span>
+                            </>
+                          ) : !isLoggedIn ? (
+                            <>
+                              <span>🔒</span>
+                              <span>LOGIN TO BUY</span>
                             </>
                           ) : (
                             <>
@@ -431,16 +440,23 @@ export default function Shop({ onBack, onLocker }: ShopProps) {
               </h3>
               
               {purchaseError ? (
-                <p className="text-red-400 mb-4 md:mb-6 text-sm md:text-base">{purchaseError}</p>
+                <div className="mb-4 md:mb-6">
+                  <p className="text-red-400 text-sm md:text-base mb-3">{purchaseError}</p>
+                  {!isLoggedIn && (
+                    <p className="text-gray-500 text-xs md:text-sm">
+                      Go to Settings → Account to sign up or log in.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-gray-400 mb-4 md:mb-6 text-sm md:text-base">
-                  {!user?.username 
-                    ? 'Please log in to purchase items with real money.'
+                  {!isLoggedIn 
+                    ? 'Please sign up or log in to purchase items with real money.'
                     : 'You can buy loot crates directly with real money, or earn Dorya Coins by playing!'}
                 </p>
               )}
               
-              {!purchaseError && user?.username && (
+              {!purchaseError && isLoggedIn && (
                 <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
                   <p className="text-gray-500 text-xs md:text-sm">Quick purchase options:</p>
                   {LOOT_CRATES.map(crate => (
