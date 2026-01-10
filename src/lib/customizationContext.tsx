@@ -159,6 +159,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (pendingPlayerData) {
       const newUserSettings = pendingPlayerData.inventory.userSettings || { ...DEFAULT_USER_SETTINGS }
+      // Merge server keybindings with defaults to ensure new fields are present
+      const newKeybindings = { ...DEFAULT_KEYBINDINGS, ...(pendingPlayerData.inventory.keybindings || {}) }
       
       setCurrency({
         doryaCoins: Math.max(0, pendingPlayerData.currency.doryaCoins),
@@ -171,7 +173,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         selectedElectricColor: pendingPlayerData.inventory.selectedElectricColor,
         selectedCharacter: pendingPlayerData.inventory.selectedCharacter,
         selectedDummy: pendingPlayerData.inventory.selectedDummy,
-        keybindings: pendingPlayerData.inventory.keybindings || { ...DEFAULT_KEYBINDINGS },
+        keybindings: newKeybindings,
         userSettings: newUserSettings,
       })
       
@@ -525,6 +527,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   // Sync from server data (used after login/signup)
   const syncFromServer = useCallback((data: ServerPlayerData) => {
     const newUserSettings = data.inventory.userSettings || { ...DEFAULT_USER_SETTINGS }
+    // Merge server keybindings with defaults to ensure new fields are present
+    const newKeybindings = { ...DEFAULT_KEYBINDINGS, ...(data.inventory.keybindings || {}) }
     
     // Override local state with server data
     setCurrency({
@@ -538,7 +542,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
       selectedElectricColor: data.inventory.selectedElectricColor,
       selectedCharacter: data.inventory.selectedCharacter,
       selectedDummy: data.inventory.selectedDummy,
-      keybindings: data.inventory.keybindings || { ...DEFAULT_KEYBINDINGS },
+      keybindings: newKeybindings,
       userSettings: newUserSettings,
     })
     
