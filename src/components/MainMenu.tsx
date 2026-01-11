@@ -85,7 +85,7 @@ export default function MainMenu({ onPlay, onHowTo, onLadder, onShop, onLocker, 
     <div className="h-full w-full flex flex-col items-center justify-center relative overflow-hidden px-4">
       {/* User display and Fullscreen button - top left */}
       <motion.div 
-        className="absolute top-3 left-3 md:top-4 md:left-4 z-20 flex items-center gap-2"
+        className="absolute top-3 left-3 md:top-4 md:left-4 z-20 flex flex-col items-start gap-2"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.5 }}
