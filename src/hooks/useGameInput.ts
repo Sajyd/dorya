@@ -337,24 +337,26 @@ export function useGameInput(
       return
     }
     
-    // Check if last input was within 1 frame AND new input has punch - if so, replace it
-    // This handles cases like pressing d+f+2 together which fires separate keydown events
-    // but should only show "df+2" not "df, df+2" (which would be invalid)
-    // Only combine direction+punch inputs - pure directional changes should always be recorded
-    // separately to ensure neutral and other directions aren't lost
+    // Check if we should combine/replace this input with the previous one
     const lastInput = inputBufferRef.current[inputBufferRef.current.length - 1]
     const SIMULTANEOUS_WINDOW_FRAMES = 1
-    const shouldCombine = lastInput && 
-      (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES && 
-      button === '2' // Only combine when punch is pressed
+    const withinWindow = lastInput && (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES
     
-    if (shouldCombine) {
-      // Same frame with punch - replace the previous input with the combined state (e.g., df -> df+2)
+    // Two cases where we replace the previous input:
+    // 1. Same frame button presses - combine simultaneous inputs (d+f -> df, df+2 -> df+2)
+    // 2. Previous was neutral on same frame - neutral wasn't held for any frames, so discard it
+    //    (e.g., releasing forward and pressing down on same frame = no actual neutral time)
+    const sameFramePress = withinWindow && lastInput.direction !== 'n'
+    const neutralNotHeld = withinWindow && lastInput.direction === 'n' && direction !== 'n'
+    const shouldReplace = sameFramePress || neutralNotHeld
+    
+    if (shouldReplace) {
+      // Replace the previous input with the new/combined state
       inputBufferRef.current[inputBufferRef.current.length - 1] = input
       setCurrentInputs([...inputBufferRef.current])
       setInputHistory(prev => [...prev.slice(0, -1), input]) // Replace last input in history
     } else {
-      // Different frame or direction-only change - add as new input
+      // Different frame - add as new input
       inputBufferRef.current.push(input)
       setCurrentInputs([...inputBufferRef.current])
       setInputHistory(prev => [...prev.slice(-19), input]) // Keep last 20 inputs
