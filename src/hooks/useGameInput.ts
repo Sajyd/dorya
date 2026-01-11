@@ -337,19 +337,24 @@ export function useGameInput(
       return
     }
     
-    // Check if last input was within 1 frame - if so, replace it instead of adding
+    // Check if last input was within 1 frame AND new input has punch - if so, replace it
     // This handles cases like pressing d+f+2 together which fires separate keydown events
     // but should only show "df+2" not "df, df+2" (which would be invalid)
-    // 1 frame window (~16ms) for simultaneous button presses
+    // Only combine direction+punch inputs - pure directional changes should always be recorded
+    // separately to ensure neutral and other directions aren't lost
     const lastInput = inputBufferRef.current[inputBufferRef.current.length - 1]
     const SIMULTANEOUS_WINDOW_FRAMES = 1
-    if (lastInput && (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES) {
-      // Same frame - replace the previous input with the combined state
+    const shouldCombine = lastInput && 
+      (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES && 
+      button === '2' // Only combine when punch is pressed
+    
+    if (shouldCombine) {
+      // Same frame with punch - replace the previous input with the combined state (e.g., df -> df+2)
       inputBufferRef.current[inputBufferRef.current.length - 1] = input
       setCurrentInputs([...inputBufferRef.current])
       setInputHistory(prev => [...prev.slice(0, -1), input]) // Replace last input in history
     } else {
-      // Different frame - add as new input
+      // Different frame or direction-only change - add as new input
       inputBufferRef.current.push(input)
       setCurrentInputs([...inputBufferRef.current])
       setInputHistory(prev => [...prev.slice(-19), input]) // Keep last 20 inputs
