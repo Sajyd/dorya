@@ -228,7 +228,7 @@ export default function Game({ mode, onBack }: GameProps) {
     inputHistory,
     handleTouchInput,
     controllerConnected,
-  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash, keybindings, activeSide)
+  } = useGameInput(state.isPlaying && !state.isPaused, onDoryaAttempt, onWavedash, keybindings, activeSide, audioSettings.devMacrosEnabled)
 
   const handleSelectSide = (side: 'p1' | 'p2') => {
     setSelectedSide(side)

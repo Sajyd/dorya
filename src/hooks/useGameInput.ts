@@ -30,7 +30,8 @@ export function useGameInput(
   onDoryaAttempt: (attempt: DoryaAttempt) => void,
   onWavedash?: (attempt: WavedashAttempt) => void,
   customKeybindings?: KeyBindings,
-  playerSide: 'p1' | 'p2' = 'p1'
+  playerSide: 'p1' | 'p2' = 'p1',
+  devMacrosEnabled: boolean = false
 ): UseGameInputReturn {
   // Memoize keybindings to prevent unnecessary re-renders
   const keybindings = useMemo(() => customKeybindings || DEFAULT_KEYBINDINGS, [customKeybindings])
@@ -53,6 +54,20 @@ export function useGameInput(
   const lastInputTimeRef = useRef(0)
   const inputWindowRef = useRef<NodeJS.Timeout | null>(null)
   const hasProcessedAttemptRef = useRef(false)
+  
+  // Throttled input history - use ref for actual data, throttle state updates
+  const inputHistoryRef = useRef<CommandInput[]>([])
+  const historyUpdateScheduledRef = useRef(false)
+  
+  // Throttled history update - syncs ref to state at most once per frame
+  const scheduleHistoryUpdate = useCallback(() => {
+    if (historyUpdateScheduledRef.current) return
+    historyUpdateScheduledRef.current = true
+    requestAnimationFrame(() => {
+      setInputHistory([...inputHistoryRef.current])
+      historyUpdateScheduledRef.current = false
+    })
+  }, [])
   
   // State tracking for EWGF detection
   const stateRef = useRef<{
@@ -213,24 +228,19 @@ export function useGameInput(
     
     if (hasNeutralBetween && !hasDownBetween) {
       // f → n → df+2 pattern
-      // PEWGF if neutral is exactly 1 frame
-      // Regular EWGF if neutral is 2-20 frames
-      // Miss if neutral is > 20 frames
+      // This is ONLY valid as PEWGF (neutral held for exactly 1 frame)
+      // If neutral is held longer, this becomes an invalid motion
+      // The player should have gone through 'd' for a proper EWGF motion (f → n → d → df+2)
       const nToDfFrames = dfPunchInput.frame - neutralInput!.frame
       frameDiff = nToDfFrames
       
       if (nToDfFrames === 1) {
         // True PEWGF: neutral held for exactly 1 frame
         result = 'perfect'
-      } else if (nToDfFrames > WAVEDASH_WINDOW_FRAMES) {
-        // Outside wavedash window - not a valid EWGF
-        return null
-      } else if (nToDfFrames <= 3) {
-        // Good EWGF - 2-3 frame neutral
-        result = 'good'
       } else {
-        // Slow EWGF - 4-20 frame neutral - valid motion but slow timing
-        result = 'bad'
+        // f → n → df+2 with n held longer than 1 frame is invalid
+        // This is a MISS - not a valid EWGF pattern
+        return null
       }
     } else if (hasDownBetween && !hasNeutralBetween) {
       // f → d → df+2 pattern (PEWGF only, no neutral)
@@ -301,7 +311,8 @@ export function useGameInput(
       state.hasDown = false
       state.lastDirection = 'f'
       setCurrentInputs([input])
-      setInputHistory(prev => [...prev.slice(-19), input])
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(-19), input]
+      scheduleHistoryUpdate()
       
       // Reset timeout for this new attempt
       if (inputWindowRef.current) {
@@ -333,7 +344,8 @@ export function useGameInput(
     // For all other inputs, only add to buffer if we have an active attempt (hasForward)
     if (!state.hasForward) {
       // No active attempt - just update history for display but don't process
-      setInputHistory(prev => [...prev.slice(-19), input])
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(-19), input]
+      scheduleHistoryUpdate()
       return
     }
     
@@ -342,24 +354,28 @@ export function useGameInput(
     const SIMULTANEOUS_WINDOW_FRAMES = 1
     const withinWindow = lastInput && (frame - lastInput.frame) <= SIMULTANEOUS_WINDOW_FRAMES
     
-    // Two cases where we replace the previous input:
+    // Two cases where we replace the previous input (only on EXACT same frame):
     // 1. Same frame button presses - combine simultaneous inputs (d+f -> df, df+2 -> df+2)
     // 2. Previous was neutral on same frame - neutral wasn't held for any frames, so discard it
     //    (e.g., releasing forward and pressing down on same frame = no actual neutral time)
-    const sameFramePress = withinWindow && lastInput.direction !== 'n'
-    const neutralNotHeld = withinWindow && lastInput.direction === 'n' && direction !== 'n'
+    // Using exact same frame (frame diff = 0) instead of within 1 frame window
+    // This allows inputs held for exactly 1 frame to be valid for PEWGF detection
+    const sameFramePress = lastInput.frame === frame && lastInput.direction !== 'n'
+    const neutralNotHeld = lastInput.frame === frame && lastInput.direction === 'n' && direction !== 'n'
     const shouldReplace = sameFramePress || neutralNotHeld
     
     if (shouldReplace) {
       // Replace the previous input with the new/combined state
       inputBufferRef.current[inputBufferRef.current.length - 1] = input
       setCurrentInputs([...inputBufferRef.current])
-      setInputHistory(prev => [...prev.slice(0, -1), input]) // Replace last input in history
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(0, -1), input]
+      scheduleHistoryUpdate()
     } else {
       // Different frame - add as new input
       inputBufferRef.current.push(input)
       setCurrentInputs([...inputBufferRef.current])
-      setInputHistory(prev => [...prev.slice(-19), input]) // Keep last 20 inputs
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(-19), input]
+      scheduleHistoryUpdate()
     }
     
     // At this point, we have an active attempt (hasForward is true)
@@ -419,7 +435,7 @@ export function useGameInput(
     }
     
     lastInputTimeRef.current = now
-  }, [getCurrentFrame, checkDoryaInput, checkWavedashMotion, checkWGFMotion, onDoryaAttempt, onWavedash, resetInputs])
+  }, [getCurrentFrame, checkDoryaInput, checkWavedashMotion, checkWGFMotion, onDoryaAttempt, onWavedash, resetInputs, scheduleHistoryUpdate])
 
   // Shared key processing logic for keyboard, touch, and gamepad
   const keyboardKeysRef = useRef<Set<string>>(new Set())
@@ -729,6 +745,65 @@ export function useGameInput(
       if (e.repeat) return
       
       const code = e.code
+      
+      // TEST MACROS: Simulate frame-perfect PEWGF inputs
+      // Keys: 1 = f→n→df+2, 2 = f→d→df+2
+      // Enable in Settings > Game > PEWGF Test Macros
+      if (devMacrosEnabled && code === 'Digit1') {
+        // Pattern 1: f → n → df+2 PEWGF (neutral held for exactly 1 frame)
+        console.log('[PEWGF MACRO 1] Simulating f → n → df+2...')
+        
+        // Frame 0: Forward
+        processInput('f', 'none')
+        
+        // Frame 2: Neutral (wait 2 frames so f isn't replaced by simultaneous window)
+        setTimeout(() => {
+          processInput('n', 'none')
+          
+          // Frame 3: df+2 (exactly 1 frame after neutral = PEWGF)
+          setTimeout(() => {
+            processInput('df', '2')
+            
+            // Frame 4: Return to neutral (release all keys)
+            setTimeout(() => {
+              processInput('n', 'none')
+              console.log('[PEWGF MACRO 1] f → n → df+2 → n complete - should be PERFECT')
+            }, FRAME_MS)
+          }, FRAME_MS)
+        }, FRAME_MS * 2)
+        
+        return
+      }
+      
+      if (devMacrosEnabled && code === 'Digit2') {
+        // Pattern 2: f → d → df+2 PEWGF (down held for exactly 1 frame)
+        // Simulates: press f, release f + press d on same frame (neutral discarded), then df+2
+        console.log('[PEWGF MACRO 2] Simulating f → (n+d) → df+2...')
+        
+        // Frame 0: Forward
+        processInput('f', 'none')
+        
+        // Frame 2: Release forward (neutral) + press down on SAME frame
+        // The neutral is discarded because d comes on the same frame
+        setTimeout(() => {
+          processInput('n', 'none')  // Release forward
+          processInput('d', 'none')  // Press down (same frame, replaces neutral)
+          
+          // Frame 3: df+2 (exactly 1 frame after down = PEWGF)
+          setTimeout(() => {
+            processInput('df', '2')
+            
+            // Frame 4: Return to neutral (release all keys)
+            setTimeout(() => {
+              processInput('n', 'none')
+              console.log('[PEWGF MACRO 2] f → d → df+2 → n complete - should be PERFECT')
+            }, FRAME_MS)
+          }, FRAME_MS)
+        }, FRAME_MS * 2)
+        
+        return
+      }
+      
       // Only process valid game keys based on current keybindings
       if (!validKeys.has(code)) return
       
@@ -762,7 +837,7 @@ export function useGameInput(
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [isPlaying, processKeyState, combineAllKeys, validKeys])
+  }, [isPlaying, processKeyState, combineAllKeys, validKeys, processInput])
 
   // Frame counter
   useEffect(() => {

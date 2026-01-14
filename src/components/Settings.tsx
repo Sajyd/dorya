@@ -59,7 +59,7 @@ function getKeyDisplayName(keyCode: string): string {
 export default function Settings({ onBack }: SettingsProps) {
   const { user, isLoggedIn, updateGuestUsername, login, signup, logout } = useUser()
   const { syncFromServer, keybindings, updateKeybinding, updatePlayerSide, resetKeybindings } = useCustomization()
-  const { settings: audioSettings, setMusicEnabled, setSfxEnabled, setMusicVolume, setSfxVolume, setShowFps, setGraphicsQuality } = useAudio()
+  const { settings: audioSettings, setMusicEnabled, setSfxEnabled, setMusicVolume, setSfxVolume, setShowFps, setGraphicsQuality, setDevMacrosEnabled } = useAudio()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   
   // Profile state
@@ -617,6 +617,28 @@ export default function Settings({ onBack }: SettingsProps) {
                     <div
                       className={`w-6 h-6 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
                         audioSettings.showFps ? 'left-[30px]' : 'left-[2px]'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Dev Macros */}
+                <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-4 mb-4">
+                  <div>
+                    <span className="font-tekken text-sm text-white tracking-wider">PEWGF TEST MACROS</span>
+                    <p className="text-gray-500 text-xs font-sans mt-1">Press 1 or 2 to test frame-perfect inputs</p>
+                  </div>
+                  <button
+                    onClick={() => setDevMacrosEnabled(!audioSettings.devMacrosEnabled)}
+                    className={`w-14 h-7 rounded-full transition-all duration-300 relative flex-shrink-0 ${
+                      audioSettings.devMacrosEnabled 
+                        ? 'bg-tekken-red' 
+                        : 'bg-gray-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-6 h-6 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-200 ${
+                        audioSettings.devMacrosEnabled ? 'left-[30px]' : 'left-[2px]'
                       }`}
                     />
                   </button>

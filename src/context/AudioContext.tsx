@@ -14,6 +14,7 @@ interface AudioContextType {
   setSfxVolume: (volume: number) => void
   setShowFps: (show: boolean) => void
   setGraphicsQuality: (quality: GraphicsQuality) => void
+  setDevMacrosEnabled: (enabled: boolean) => void
   // Sync function to be called by customization context
   syncSettings: (newSettings: UserSettings) => void
   // Callback to notify when settings change
@@ -96,6 +97,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     updateSettingsAndNotify(newSettings)
   }, [settings, updateSettingsAndNotify])
 
+  const setDevMacrosEnabled = useCallback((enabled: boolean) => {
+    const newSettings = { ...settings, devMacrosEnabled: enabled }
+    updateSettingsAndNotify(newSettings)
+  }, [settings, updateSettingsAndNotify])
+
   // Sync settings from customization context (called on init/login)
   const syncSettings = useCallback((newSettings: UserSettings) => {
     setSettings(newSettings)
@@ -115,6 +121,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setSfxVolume,
         setShowFps,
         setGraphicsQuality,
+        setDevMacrosEnabled,
         syncSettings,
         onSettingsChange: onSettingsChangeRef.current,
         setOnSettingsChange,

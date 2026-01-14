@@ -132,6 +132,7 @@ export interface UserSettings {
   sfxVolume: number
   showFps: boolean
   graphicsQuality: GraphicsQuality
+  devMacrosEnabled: boolean // Enable PEWGF test macros (keys 1 & 2)
 }
 
 // Default user settings
@@ -142,6 +143,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   sfxVolume: 0.7,
   showFps: false,
   graphicsQuality: 'high',
+  devMacrosEnabled: false,
 }
 
 // Player's inventory
