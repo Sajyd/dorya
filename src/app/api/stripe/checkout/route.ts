@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { LOOT_CRATES } from '@/lib/customizationData'
 import { CrateType } from '@/types/game'
 
+// Force dynamic rendering since this route uses cookies
+export const dynamic = 'force-dynamic'
+
 const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
 
 export async function POST(request: Request) {

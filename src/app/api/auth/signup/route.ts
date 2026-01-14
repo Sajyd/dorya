@@ -3,6 +3,9 @@ import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { createHash, randomBytes } from 'crypto'
 
+// Force dynamic rendering since this route uses cookies
+export const dynamic = 'force-dynamic'
+
 const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
 const GUEST_TOKEN_COOKIE = 'dorya_guest_token'
 

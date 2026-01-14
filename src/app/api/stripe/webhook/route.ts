@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { LOOT_CRATES, rollCrateItems } from '@/lib/customizationData'
 import Stripe from 'stripe'
 
+// Force dynamic rendering since this route uses headers
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   const body = await request.text()
   const headersList = await headers()

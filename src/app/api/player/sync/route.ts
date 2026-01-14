@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
 
+// Force dynamic rendering since this route uses cookies
+export const dynamic = 'force-dynamic'
+
 const GUEST_TOKEN_COOKIE = 'dorya_guest_token'
 const AUTH_TOKEN_COOKIE = 'dorya_auth_token'
 
