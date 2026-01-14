@@ -54,6 +54,7 @@ export function useGameInput(
   const lastInputTimeRef = useRef(0)
   const inputWindowRef = useRef<NodeJS.Timeout | null>(null)
   const hasProcessedAttemptRef = useRef(false)
+  const isMacroInProgressRef = useRef(false) // Track if current input is from a test macro
   
   // Throttled input history - use ref for actual data, throttle state updates
   const inputHistoryRef = useRef<CommandInput[]>([])
@@ -330,10 +331,12 @@ export function useGameInput(
               timing: -1,
               timestamp: Date.now(),
               validMotion: hadValidMotion,
+              isMacro: isMacroInProgressRef.current,
             }
             setLastAttempt(missAttempt)
             onDoryaAttempt(missAttempt)
           }
+          isMacroInProgressRef.current = false
           resetInputs()
         }
       }, 500)
@@ -397,8 +400,10 @@ export function useGameInput(
       const attempt = checkDoryaInput(inputBufferRef.current)
       if (attempt) {
         hasProcessedAttemptRef.current = true
-        setLastAttempt(attempt)
-        onDoryaAttempt(attempt)
+        const finalAttempt = { ...attempt, isMacro: isMacroInProgressRef.current }
+        setLastAttempt(finalAttempt)
+        onDoryaAttempt(finalAttempt)
+        isMacroInProgressRef.current = false
         resetInputs()
         return
       } else {
@@ -411,9 +416,11 @@ export function useGameInput(
           timing: -1,
           timestamp: Date.now(),
           validMotion: hadValidMotion,
+          isMacro: isMacroInProgressRef.current,
         }
         setLastAttempt(missAttempt)
         onDoryaAttempt(missAttempt)
+        isMacroInProgressRef.current = false
         resetInputs()
         return
       }
@@ -427,9 +434,11 @@ export function useGameInput(
         timing: -1,
         timestamp: Date.now(),
         validMotion: hadValidMotion,
+        isMacro: isMacroInProgressRef.current,
       }
       setLastAttempt(missAttempt)
       onDoryaAttempt(missAttempt)
+      isMacroInProgressRef.current = false
       resetInputs()
       return
     }
@@ -752,6 +761,7 @@ export function useGameInput(
       if (devMacrosEnabled && code === 'Digit1') {
         // Pattern 1: f → n → df+2 PEWGF (neutral held for exactly 1 frame)
         console.log('[PEWGF MACRO 1] Simulating f → n → df+2...')
+        isMacroInProgressRef.current = true
         
         // Frame 0: Forward
         processInput('f', 'none')
@@ -779,6 +789,7 @@ export function useGameInput(
         // Pattern 2: f → d → df+2 PEWGF (down held for exactly 1 frame)
         // Simulates: press f, release f + press d on same frame (neutral discarded), then df+2
         console.log('[PEWGF MACRO 2] Simulating f → (n+d) → df+2...')
+        isMacroInProgressRef.current = true
         
         // Frame 0: Forward
         processInput('f', 'none')

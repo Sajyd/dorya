@@ -179,6 +179,7 @@ export interface DoryaAttempt {
   timing: number // Frame timing from d to df+2
   timestamp: number
   validMotion?: boolean // True if inputs matched WGF motion (f → n → d → df+2) even on miss
+  isMacro?: boolean // True if triggered by test macro (no coins/scoring)
 }
 
 // Game state

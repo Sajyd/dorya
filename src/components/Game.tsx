@@ -187,7 +187,10 @@ export default function Game({ mode, onBack }: GameProps) {
   } = useGameState(mode)
 
   const onDoryaAttempt = useCallback((attempt: Parameters<typeof handleAttempt>[0]) => {
-    handleAttempt(attempt)
+    // Skip scoring for macro attempts (but still play sounds for feedback)
+    if (!attempt.isMacro) {
+      handleAttempt(attempt)
+    }
     
     // Play sound effects based on result (only if SFX is enabled)
     if (!audioSettings.sfxEnabled) return
