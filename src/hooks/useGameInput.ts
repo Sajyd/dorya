@@ -312,7 +312,7 @@ export function useGameInput(
       state.hasDown = false
       state.lastDirection = 'f'
       setCurrentInputs([input])
-      inputHistoryRef.current = [...inputHistoryRef.current.slice(-19), input]
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(-7), input]
       scheduleHistoryUpdate()
       
       // Reset timeout for this new attempt
@@ -347,7 +347,7 @@ export function useGameInput(
     // For all other inputs, only add to buffer if we have an active attempt (hasForward)
     if (!state.hasForward) {
       // No active attempt - just update history for display but don't process
-      inputHistoryRef.current = [...inputHistoryRef.current.slice(-19), input]
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(-7), input]
       scheduleHistoryUpdate()
       return
     }
@@ -377,7 +377,7 @@ export function useGameInput(
       // Different frame - add as new input
       inputBufferRef.current.push(input)
       setCurrentInputs([...inputBufferRef.current])
-      inputHistoryRef.current = [...inputHistoryRef.current.slice(-19), input]
+      inputHistoryRef.current = [...inputHistoryRef.current.slice(-7), input]
       scheduleHistoryUpdate()
     }
     
