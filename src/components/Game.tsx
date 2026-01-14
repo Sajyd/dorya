@@ -304,7 +304,13 @@ export default function Game({ mode, onBack }: GameProps) {
       <div className="absolute inset-0">
         <GameScene
           isPlaying={state.isPlaying}
-          lastAttempt={state.lastAttempt || lastAttempt}
+          lastAttempt={
+            // Use the most recent attempt (comparing timestamps)
+            // This ensures macro attempts trigger animations even though they skip handleAttempt
+            lastAttempt && (!state.lastAttempt || lastAttempt.timestamp >= state.lastAttempt.timestamp)
+              ? lastAttempt
+              : state.lastAttempt
+          }
           currentStreak={state.currentStreak}
           customization={activeCustomization}
           playerSide={activeSide}
